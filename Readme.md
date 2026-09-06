@@ -7,7 +7,7 @@ A lightweight, background Windows system tray utility to control Spotify volume 
 - **Invisible Background Process:** Runs as a native Windows GUI app (`WinMain`) with no persistent command prompt or terminal window.
 - **System Tray Management:** Right-click context menu to view status, edit settings, open logs, toggle Windows autostart, or exit.
 - **First-Run Setup Wizard:** Automatically spawns a temporary terminal on initial launch if credentials are missing to guide setup interactively.
-- **Live Config Watcher:** Automatically detects modifications to `%APPDATA%\SpotifyVolumeHotkey\config.json` and updates hotkeys or authentication in real time.
+- **Live Config Watcher:** Automatically detects modifications to `%APPDATA%\SpotifyVolumeHotkeys\config.json` and updates hotkeys or authentication in real time.
 - **Autostart Integration:** Clean, non-intrusive autostart via `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
 
 ---
@@ -27,8 +27,8 @@ This project uses **vcpkg Manifest Mode** (`vcpkg.json`). Dependencies (`cpp-htt
 
 1. **Clone the repository:**
    ```powershell
-   git clone [https://github.com/](https://github.com/)<YourUsername>/SpotifyVolumeHotkey.git
-   cd SpotifyVolumeHotkey
+   git clone [https://github.com/](https://github.com/)<YourUsername>/SpotifyVolumeHotkeys.git
+   cd SpotifyVolumeHotkeys
    ```
 
 2. **Configure CMake:**
@@ -56,7 +56,7 @@ The compiled binary will be located at `build/Release/spotifyVolumeHotkeys.exe`.
 
 ### Manual Configuration
 You can edit configuration at any time by selecting **Edit Config & Hotkeys** from the tray icon or by opening:
-`%APPDATA%\SpotifyVolumeHotkey\config.json`
+`%APPDATA%\SpotifyVolumeHotkeys\config.json`
 
 ```json
 {
