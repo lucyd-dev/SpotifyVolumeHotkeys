@@ -1,0 +1,30 @@
+# Build outputs & CMake caches
+build/
+bin/
+out/
+CMakeCache.txt
+CMakeFiles/
+*.dir/
+*.ninja
+.ninja_*
+
+# vcpkg local package installs
+vcpkg_installed/
+
+# VS Code & Visual Studio (ignore local paths)
+.vs/
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+*.user
+*.suo
+
+# Application secrets & user config (in AppData during runtime)
+config.json
+*.log
+
+# Keep the public root certificate bundle
+*.key
+*.pfx
+*.pem
+!include/certs/cacert.pem

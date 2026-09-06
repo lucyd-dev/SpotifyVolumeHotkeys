@@ -1,0 +1,11 @@
+{
+  "name": "spotify-volume-hotkey",
+  "version-string": "0.1.0",
+  "dependencies": [
+    {
+      "name": "cpp-httplib",
+      "features": ["openssl"]
+    },
+    "nlohmann-json"
+  ]
+}
