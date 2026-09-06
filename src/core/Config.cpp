@@ -80,6 +80,22 @@ AppConfig Config::load()
         {
             config.refreshToken = data["refresh_token"].get<std::string>();
         }
+        if (data.contains("autostart") && data["autostart"].is_boolean())
+        {
+            config.autostart = data["autostart"].get<bool>();
+        }
+        if (data.contains("hotkeys") && data["hotkeys"].is_object())
+        {
+            const auto &hotkeys = data["hotkeys"];
+            if (hotkeys.contains("volume_down") && hotkeys["volume_down"].is_string())
+            {
+                config.volumeDownKey = hotkeys["volume_down"].get<std::string>();
+            }
+            if (hotkeys.contains("volume_up") && hotkeys["volume_up"].is_string())
+            {
+                config.volumeUpKey = hotkeys["volume_up"].get<std::string>();
+            }
+        }
 
         Logger::debug("Successfully loaded config from " + m_path.string());
     }
@@ -106,6 +122,9 @@ bool Config::save(const AppConfig &config) const
     data["client_id"] = config.clientId;
     data["client_secret"] = config.clientSecret;
     data["refresh_token"] = config.refreshToken;
+    data["autostart"] = config.autostart;
+    data["hotkeys"]["volume_down"] = config.volumeDownKey;
+    data["hotkeys"]["volume_up"] = config.volumeUpKey;
 
     auto parent = m_path.parent_path();
     if (!parent.empty())
@@ -124,4 +143,16 @@ bool Config::save(const AppConfig &config) const
     outFile << std::setw(4) << data << std::endl;
     Logger::debug("Config successfully saved to " + m_path.string());
     return true;
+}
+
+std::filesystem::file_time_type Config::lastWriteTime() const
+{
+    try
+    {
+        return std::filesystem::last_write_time(m_path);
+    }
+    catch (...)
+    {
+        return std::filesystem::file_time_type{};
+    }
 }

@@ -8,6 +8,9 @@ struct AppConfig
     std::string clientId;
     std::string clientSecret;
     std::string refreshToken;
+    std::string volumeDownKey = "F13";
+    std::string volumeUpKey = "F14";
+    bool autostart = true;
 };
 
 class Config
@@ -18,6 +21,7 @@ public:
     AppConfig load();
     bool save(const AppConfig &config) const;
     const std::filesystem::path &path() const noexcept { return m_path; }
+    std::filesystem::file_time_type lastWriteTime() const;
 
 private:
     static std::filesystem::path defaultPath();

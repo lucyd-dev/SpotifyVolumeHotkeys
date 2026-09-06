@@ -34,6 +34,7 @@ public:
     bool isAuthenticated() const;
     bool ensureFreshToken();
     bool ensureValidSession();
+    void applyConfig(const AppConfig &config);
 
 private:
     void saveConfig();

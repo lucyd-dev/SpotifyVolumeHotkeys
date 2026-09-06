@@ -18,6 +18,8 @@ add_executable(${PROJECT_NAME}
     resources.rc
 )
 
+set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
+
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )

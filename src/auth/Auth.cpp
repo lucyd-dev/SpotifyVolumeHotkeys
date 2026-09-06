@@ -420,3 +420,13 @@ void Auth::saveConfig()
     }
     m_config.save(appConfig);
 }
+
+void Auth::applyConfig(const AppConfig &config)
+{
+    std::lock_guard<std::mutex> lock(m_tokenMutex);
+    m_clientId = config.clientId;
+    m_clientSecret = config.clientSecret;
+    m_refreshToken = config.refreshToken;
+    m_accessToken.clear();
+    m_tokenExpiry = std::chrono::steady_clock::time_point{};
+}
