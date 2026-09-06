@@ -411,7 +411,7 @@ bool Auth::ensureValidSession()
 
 void Auth::saveConfig()
 {
-    AppConfig appConfig;
+    AppConfig appConfig = m_config.load();
     appConfig.clientId = m_clientId;
     appConfig.clientSecret = m_clientSecret;
     {
