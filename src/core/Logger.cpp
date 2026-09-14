@@ -47,6 +47,11 @@ namespace Logger
         logFile = logFilePath;
     }
 
+    std::string getLogFilePath()
+    {
+        return logFile;
+    }
+
     void setShowDialogs(bool show)
     {
         showDialogs = show;

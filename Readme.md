@@ -4,11 +4,18 @@ A lightweight, background Windows system tray utility to control Spotify volume 
 
 ## Features
 
-- **Invisible Background Process:** Runs as a native Windows GUI app (`WinMain`) with no persistent command prompt or terminal window.
-- **System Tray Management:** Right-click context menu to view status, edit settings, open logs, toggle Windows autostart, or exit.
-- **First-Run Setup Wizard:** Automatically spawns a temporary terminal on initial launch if credentials are missing to guide setup interactively.
-- **Live Config Watcher:** Automatically detects modifications to `%APPDATA%\SpotifyVolumeHotkeys\config.json` and updates hotkeys or authentication in real time.
-- **Autostart Integration:** Clean, non-intrusive autostart via `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+- **Volume hotkeys from anywhere:** Press `F13` and `F14` (customizable) to lower and raise Spotify's volume while using any application.
+- **Runs quietly in the background:** No windows, no terminal — just a small icon in your system tray.
+- **System tray menu:** Left or Right-click the tray icon to see the current status, edit your settings, open the logs folder, toggle starting with Windows, restart, or exit.
+- **Start with Windows:** Optional autostart so your hotkeys are always ready after a reboot.
+- **Edit settings without restarting:** Save changes to your config file and they take effect automatically.
+- **First-run setup wizard:** Walking you through connecting to Spotify and setting your hotkeys.
+
+> [!NOTE]
+> The first-run setup wizard is still a work in progress.
+
+> [!WARNING]
+> Spotify's API is heavily rate-limited, which makes smooth (continuous) volume changes impossible. Volume changes are therefore sent deferred by a quarter of a second, and player data (active device, current volume) is polled every 5 seconds.
 
 ---
 

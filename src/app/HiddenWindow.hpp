@@ -13,6 +13,12 @@ public:
     void destroy();
 
 private:
+    struct WindowData
+    {
+        AppController *owner;
+        WNDPROC originalProc;
+    };
+
     static LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
     HWND m_hwnd;

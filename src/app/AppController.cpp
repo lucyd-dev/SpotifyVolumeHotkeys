@@ -1,9 +1,13 @@
 #include "AppController.hpp"
 #include "HiddenWindow.hpp"
+#include "HotkeyMap.hpp"
+#include "Autostart.hpp"
 #include "../core/Logger.hpp"
+#include <vector>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <shellapi.h>
 #include <algorithm>
 #include <chrono>
 #include <string>
@@ -12,61 +16,15 @@ AppController::AppController(AppConfig config, Auth &auth)
     : m_appConfig(std::move(config)),
       m_auth(auth),
       m_volume(auth),
-      m_playerTimerId(0),
-      m_inputTimerId(0),
       m_currentVolume(-1),
       m_pendingVolume(0),
       m_lastChange(std::chrono::steady_clock::time_point{}),
       m_hotkeyDownRegistered(false),
-      m_hotkeyUpRegistered(false)
+      m_hotkeyUpRegistered(false),
+      m_autostartEnabled(false),
+      m_lastConfigMtime(std::filesystem::file_time_type{}),
+      m_exitAction(ExitAction::Exit)
 {
-}
-
-UINT AppController::vkFromKeyName(const std::string &name)
-{
-    std::string upper;
-    upper.reserve(name.size());
-    for (std::size_t i = 0; i < name.size(); ++i)
-    {
-        char c = name[i];
-        if (c >= 'a' && c <= 'z')
-        {
-            c = (char)(c - ('a' - 'A'));
-        }
-        upper += c;
-    }
-
-    if (upper == "SPACE") return VK_SPACE;
-    if (upper == "UP")    return VK_UP;
-    if (upper == "DOWN")  return VK_DOWN;
-    if (upper == "LEFT")  return VK_LEFT;
-    if (upper == "RIGHT") return VK_RIGHT;
-
-    if (upper.size() == 1 && upper[0] >= 'A' && upper[0] <= 'Z')
-    {
-        return (UINT)upper[0];
-    }
-    if (upper.size() == 1 && upper[0] >= '0' && upper[0] <= '9')
-    {
-        return (UINT)upper[0];
-    }
-
-    if (upper.size() >= 2 && upper[0] == 'F')
-    {
-        int num = 0;
-        std::size_t i;
-        for (i = 1; i < upper.size(); ++i)
-        {
-            if (upper[i] < '0' || upper[i] > '9') break;
-            num = num * 10 + (upper[i] - '0');
-        }
-        if (i == upper.size() && num >= 1 && num <= 24)
-        {
-            return (UINT)(VK_F1 + num - 1);
-        }
-    }
-
-    return 0;
 }
 
 bool AppController::startup(HINSTANCE hInstance)
@@ -77,13 +35,34 @@ bool AppController::startup(HINSTANCE hInstance)
         return false;
     }
 
-    registerHotkeys();
-    setPlayerTimer();
+    m_lastConfigMtime = m_config.lastWriteTime();
+    m_autostartEnabled = Autostart::isEnabled();
+
+    if (m_appConfig.autostart && !m_autostartEnabled)
+    {
+        if (Autostart::setEnabled(true))
+        {
+            m_autostartEnabled = true;
+            Logger::info("Autostart enabled to match the config file.");
+        }
+    }
+
+    applyHotkeys();
+    SetTimer(m_window.handle(), TIMER_PLAYER, PLAYER_TIMER_INTERVAL, NULL);
+    SetTimer(m_window.handle(), TIMER_CONFIG, CONFIG_TIMER_INTERVAL, NULL);
+
+    m_tray.configure(m_window.handle(), hInstance, WM_TRAY_CALLBACK);
+    if (!m_tray.add())
+    {
+        Logger::fatal("Failed to add the tray icon.");
+    }
+
     updateCurrentVolume();
+    updateTrayStatus();
     return true;
 }
 
-int AppController::run()
+AppController::ExitAction AppController::run()
 {
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0) > 0)
@@ -91,21 +70,15 @@ int AppController::run()
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-    return 0;
+    return m_exitAction;
 }
 
 void AppController::shutdown()
 {
-    if (m_inputTimerId)
-    {
-        KillTimer(m_window.handle(), m_inputTimerId);
-        m_inputTimerId = 0;
-    }
-    if (m_playerTimerId)
-    {
-        KillTimer(m_window.handle(), m_playerTimerId);
-        m_playerTimerId = 0;
-    }
+    KillTimer(m_window.handle(), TIMER_INPUT);
+    KillTimer(m_window.handle(), TIMER_PLAYER);
+    KillTimer(m_window.handle(), TIMER_CONFIG);
+    m_inputDebounceActive = false;
     m_pendingVolume = 0;
 
     if (m_hotkeyDownRegistered)
@@ -119,13 +92,13 @@ void AppController::shutdown()
         m_hotkeyUpRegistered = false;
     }
 
+    m_tray.remove();
     m_window.destroy();
 }
 
 bool AppController::handleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     (void)hwnd;
-    (void)lParam;
 
     switch (msg)
     {
@@ -134,130 +107,276 @@ bool AppController::handleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
         return true;
 
     case WM_TIMER:
-        if (wParam == m_inputTimerId)
+        switch (wParam)
         {
+        case TIMER_INPUT:
             onInputTimer();
             return true;
-        }
-        if (wParam == m_playerTimerId)
-        {
+        case TIMER_PLAYER:
             onPlayerTimer();
+            return true;
+        case TIMER_CONFIG:
+            onConfigTimer();
             return true;
         }
         return false;
+
+    case WM_TRAY_CALLBACK:
+        onTrayCallback(lParam);
+        return true;
 
     default:
         return false;
     }
 }
 
-void AppController::registerHotkeys()
+void AppController::applyHotkeys()
 {
-    UINT downVK = vkFromKeyName(m_appConfig.volumeDownKey);
-    UINT upVK = vkFromKeyName(m_appConfig.volumeUpKey);
-
-    if (downVK != 0 && RegisterHotKey(m_window.handle(), HOTKEY_VOL_DOWN, 0, downVK))
+    if (m_hotkeyDownRegistered)
     {
-        m_hotkeyDownRegistered = true;
+        UnregisterHotKey(m_window.handle(), HOTKEY_VOL_DOWN);
+        m_hotkeyDownRegistered = false;
     }
-    else
+    if (m_hotkeyUpRegistered)
     {
-        Logger::warn("Failed to register volume-down hotkey (" +
-                     m_appConfig.volumeDownKey + ").");
+        UnregisterHotKey(m_window.handle(), HOTKEY_VOL_UP);
+        m_hotkeyUpRegistered = false;
     }
 
-    if (upVK != 0 && RegisterHotKey(m_window.handle(), HOTKEY_VOL_UP, 0, upVK))
+    registerHotkey(m_appConfig.volumeDownKey, HOTKEY_VOL_DOWN);
+    registerHotkey(m_appConfig.volumeUpKey, HOTKEY_VOL_UP);
+}
+
+void AppController::registerHotkey(const std::string &name, const UINT id)
+{
+    std::string reason;
+    if (!HotkeyMap::validate(name, reason))
+    {
+        Logger::warn("Invalid hotkey: " + reason);
+        return;
+    }
+    
+    if (RegisterHotKey(m_window.handle(), id, 0,
+                            HotkeyMap::toVk(name)))
     {
         m_hotkeyUpRegistered = true;
+        return;
     }
-    else
-    {
-        Logger::warn("Failed to register volume-up hotkey (" +
-                     m_appConfig.volumeUpKey + ").");
-    }
+    
+    Logger::warn("Hotkey " + name + " in use by another application");
 }
 
 void AppController::onHotkey(WPARAM wParam)
 {
     int id = (int)wParam;
-    if (id == HOTKEY_VOL_DOWN)
-    {
-        volumeChange(-VOLUME_CHANGE_STEP);
-    }
-    else if (id == HOTKEY_VOL_UP)
-    {
-        volumeChange(VOLUME_CHANGE_STEP);
-    }
-}
-
-void AppController::volumeChange(int change)
-{
-    m_pendingVolume += change;
-    m_inputTimerId = SetTimer(m_window.handle(), m_inputTimerId,
-                              INPUT_TIMER_INTERVAL, NULL);
-}
-
-void AppController::setPlayerTimer()
-{
-    m_playerTimerId = SetTimer(m_window.handle(), m_playerTimerId,
-                               PLAYER_TIMER_INTERVAL, NULL);
+    int step = (id == HOTKEY_VOL_UP) ? VOLUME_CHANGE_STEP : -VOLUME_CHANGE_STEP;
+    
+    m_pendingVolume += step;
+    m_inputDebounceActive = true;
+    SetTimer(m_window.handle(), TIMER_INPUT, INPUT_TIMER_INTERVAL, NULL);
 }
 
 void AppController::updateCurrentVolume()
 {
     int playerVolume = m_volume.getPlayerVolume();
-    if (playerVolume != -1)
+    m_currentVolume = playerVolume;
+}
+
+void AppController::updateTrayStatus()
+{
+    std::wstring status;
+    if (m_volume.isRateLimited())
     {
-        m_currentVolume = playerVolume;
+        status = L"Rate limited";
+    }
+    else if (!m_volume.isPlayerActive())
+    {
+        status = L"No active device";
+    }
+    else if (m_currentVolume >= 0)
+    {
+        status = L"Player active \u00B7 " + std::to_wstring(m_currentVolume) + L"%";
+    }
+    else
+    {
+        status = L"Player active";
+    }
+
+    if (status != m_statusText)
+    {
+        m_statusText = status;
+        m_tray.setStatus(status);
     }
 }
 
 void AppController::onInputTimer()
 {
-    KillTimer(m_window.handle(), m_inputTimerId);
-    m_inputTimerId = 0;
+    KillTimer(m_window.handle(), TIMER_INPUT);
+    m_inputDebounceActive = false;
 
-    if (!m_volume.isPlayerActive() || m_volume.isRateLimited())
+    if (!m_volume.isPlayerActive() || m_volume.isRateLimited() || m_currentVolume < 0)
     {
         m_pendingVolume = 0;
+        return;
     }
-    else if (m_currentVolume >= 0)
+    
+    int newVolume = std::clamp(m_currentVolume + m_pendingVolume, 0, 100);
+    if (m_volume.setPlayerVolume(newVolume))
     {
-        int newVolume = m_currentVolume + m_pendingVolume;
-        if (m_volume.setPlayerVolume(newVolume))
-        {
-            m_currentVolume = newVolume;
-            m_pendingVolume = 0;
-            m_lastChange = std::chrono::steady_clock::now();
-        }
+        m_currentVolume = newVolume;
+        m_lastChange = std::chrono::steady_clock::now();
+        updateTrayStatus();
     }
+    
+    m_pendingVolume = 0;
 }
 
 void AppController::onPlayerTimer()
 {
-    KillTimer(m_window.handle(), m_playerTimerId);
-    m_playerTimerId = 0;
-
     auto now = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lastChange).count();
-
-    if (elapsed >= 2000)
+    if (elapsed >= 1000)
     {
         updateCurrentVolume();
+        updateTrayStatus();
+    }
+}
+
+void AppController::onConfigTimer()
+{
+    auto mtime = m_config.lastWriteTime();
+    if (mtime == std::filesystem::file_time_type{} || mtime == m_lastConfigMtime)
+    {
+        return;
+    }
+    m_lastConfigMtime = mtime;
+    applyConfigReload();
+}
+
+void AppController::applyConfigReload()
+{
+    AppConfig fresh = m_config.load();
+
+    if (!m_config.lastLoadSuccess() ||
+        (fresh.clientId.empty() && fresh.clientSecret.empty()))
+    {
+        Logger::warn("Config file unparsable or missing credentials; "
+                     "keeping the running configuration.");
+        return;
     }
 
-    if (m_volume.isRateLimited() && m_pendingVolume != 0 &&
-        m_volume.isPlayerActive() && m_currentVolume >= 0)
+    bool hotkeysChanged = fresh.volumeDownKey != m_appConfig.volumeDownKey ||
+                          fresh.volumeUpKey != m_appConfig.volumeUpKey;
+    bool credsChanged = fresh.clientId != m_appConfig.clientId ||
+                        fresh.clientSecret != m_appConfig.clientSecret;
+    bool autostartChanged = fresh.autostart != m_appConfig.autostart;
+
+    if (hotkeysChanged)
     {
-        int newVolume = m_currentVolume + m_pendingVolume;
-        newVolume = std::clamp(newVolume, 0, 100);
-        if (m_volume.setPlayerVolume(newVolume))
+        m_appConfig.volumeDownKey = fresh.volumeDownKey;
+        m_appConfig.volumeUpKey = fresh.volumeUpKey;
+        applyHotkeys();
+    }
+
+    if (credsChanged)
+    {
+        m_auth.applyConfig(fresh);
+        m_appConfig.clientId = fresh.clientId;
+        m_appConfig.clientSecret = fresh.clientSecret;
+        m_appConfig.refreshToken = fresh.refreshToken;
+    }
+
+    if (autostartChanged)
+    {
+        if (Autostart::setEnabled(fresh.autostart))
         {
-            m_currentVolume = newVolume;
-            m_pendingVolume = 0;
-            m_lastChange = std::chrono::steady_clock::now();
+            m_appConfig.autostart = fresh.autostart;
+            m_autostartEnabled = fresh.autostart;
         }
     }
 
-    setPlayerTimer();
+    if (hotkeysChanged || credsChanged || autostartChanged)
+    {
+        Logger::info("Config file changed; credentials, hotkeys and autostart reloaded.");
+    }
+}
+
+void AppController::onTrayCallback(LPARAM lParam)
+{
+    UINT event = LOWORD(lParam);
+    if (event == WM_LBUTTONUP  || event == WM_RBUTTONUP)
+    {
+        int cmd = m_tray.showPopup(m_statusText, m_autostartEnabled);
+        if (cmd > 0)
+        {
+            handleMenuCommand(cmd);
+        }
+    }
+}
+
+void AppController::handleMenuCommand(int cmd)
+{
+    switch (cmd)
+    {
+    case TrayIcon::MenuEditConfig:
+        openConfigInEditor();
+        break;
+    case TrayIcon::MenuOpenLogs:
+        openLogsFolder();
+        break;
+    case TrayIcon::MenuToggleAutostart:
+        toggleAutostart();
+        break;
+    case TrayIcon::MenuRestart:
+        restartApp();
+        break;
+    case TrayIcon::MenuExit:
+        requestExit();
+        break;
+    default:
+        break;
+    }
+}
+
+void AppController::openConfigInEditor()
+{
+    std::wstring cfg = m_config.path().wstring();
+    ShellExecuteW(NULL, L"open", L"notepad.exe", cfg.c_str(), NULL, SW_SHOWNORMAL);
+}
+
+void AppController::openLogsFolder()
+{
+    std::vector<wchar_t> logPath = Logger::utf16(Logger::getLogFilePath());
+    std::wstring params = L"/select,\"" + std::wstring(logPath.data()) + L"\"";
+    ShellExecuteW(NULL, L"open", L"explorer.exe", params.c_str(), NULL, SW_SHOWNORMAL);
+}
+
+void AppController::toggleAutostart()
+{
+    bool newValue = !m_autostartEnabled;
+    if (!Autostart::setEnabled(newValue))
+    {
+        return;
+    }
+
+    m_autostartEnabled = newValue;
+    m_appConfig.autostart = newValue;
+    if (m_config.save(m_appConfig))
+    {
+        m_lastConfigMtime = m_config.lastWriteTime();
+    }
+    Logger::info(std::string("Autostart ") +
+                 (m_autostartEnabled ? "enabled" : "disabled") + ".");
+}
+
+void AppController::restartApp()
+{
+    m_exitAction = ExitAction::Restart;
+    PostQuitMessage(0);
+}
+
+void AppController::requestExit()
+{
+    m_exitAction = ExitAction::Exit;
+    PostQuitMessage(0);
 }

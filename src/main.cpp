@@ -1,5 +1,6 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <shellapi.h>
 #include <filesystem>
 #include <string>
 
@@ -57,9 +58,26 @@ int wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int)
         }
 
         Logger::info("App started. Wait for input...");
-        int result = controller.run();
+        AppController::ExitAction action = controller.run();
         controller.shutdown();
-        return result;
+
+        if (action == AppController::ExitAction::Restart)
+        {
+            if (instanceMutex)
+            {
+                CloseHandle(instanceMutex);
+                instanceMutex = NULL;
+            }
+
+            wchar_t exePath[MAX_PATH];
+            DWORD exeLen = GetModuleFileNameW(NULL, exePath, MAX_PATH);
+            if (exeLen > 0 && exeLen < MAX_PATH)
+            {
+                exePath[exeLen] = L'\0';
+                ShellExecuteW(NULL, L"open", exePath, L"--restart", NULL, SW_SHOWNORMAL);
+            }
+        }
+        return 0;
     }
     catch (const std::exception &e)
     {

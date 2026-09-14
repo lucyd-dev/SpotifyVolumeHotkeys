@@ -25,15 +25,21 @@ namespace
         }
     }
 
-    std::string formatClock(std::chrono::steady_clock::time_point)
+    std::string formatClock(std::chrono::steady_clock::time_point tp)
     {
-        auto t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        using namespace std::chrono;
+        auto nowSteady = steady_clock::now();
+        auto remaining = duration_cast<seconds>(tp - nowSteady);
+        auto targetSystem = system_clock::now() + remaining;
+
+        auto t = system_clock::to_time_t(targetSystem);
         std::tm tm{};
-#ifdef _WIN32
+    #ifdef _WIN32
         localtime_s(&tm, &t);
-#else
+    #else
         localtime_r(&t, &tm);
-#endif
+    #endif
+
         std::ostringstream oss;
         oss << std::put_time(&tm, "%H:%M:%S");
         return oss.str();
@@ -246,11 +252,6 @@ int VolumeControl::getPlayerVolume()
 
     if (!isActive || isRestricted || !supportsVolume || volume < 0)
     {
-        Logger::warn(std::string("Device not controllable: is_active=") +
-                     (isActive ? "true" : "false") +
-                     ", is_restricted=" + (isRestricted ? "true" : "false") +
-                     ", supports_volume=" + (supportsVolume ? "true" : "false") +
-                     ", volume_percent=" + std::to_string(volume));
         markInactive("getPlayerVolume");
         return -1;
     }
@@ -272,9 +273,6 @@ bool VolumeControl::setPlayerVolume(int volume)
         return false;
     }
 
-    volume = std::clamp(volume, 0, 100);
-    int requestedVolume = volume;
-
     auto build = [&]() -> httplib::Result
     {
         auto cli = HttpClient::getClient("https://api.spotify.com");
@@ -292,7 +290,7 @@ bool VolumeControl::setPlayerVolume(int volume)
 
     if (result.response->status == 204)
     {
-        Logger::debug("setPlayerVolume: volume changed to " + std::to_string(requestedVolume) + "%");
+        Logger::debug("setPlayerVolume: volume changed to " + std::to_string(volume) + "%");
         return true;
     }
 

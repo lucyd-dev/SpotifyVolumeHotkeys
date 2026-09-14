@@ -16,6 +16,7 @@ namespace Logger
     };
 
     void setLogFile(const std::string &logFilePath);
+    std::string getLogFilePath();
     void cleanupLogFile();
     void setShowDialogs(bool show);
     void setConsoleActive(bool active);

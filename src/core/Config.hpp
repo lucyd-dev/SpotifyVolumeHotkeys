@@ -20,6 +20,7 @@ public:
 
     AppConfig load();
     bool save(const AppConfig &config) const;
+    bool lastLoadSuccess() const noexcept { return m_lastLoadOk; }
     const std::filesystem::path &path() const noexcept { return m_path; }
     std::filesystem::file_time_type lastWriteTime() const;
 
@@ -27,4 +28,5 @@ private:
     static std::filesystem::path defaultPath();
 
     std::filesystem::path m_path;
+    bool m_lastLoadOk = true;
 };

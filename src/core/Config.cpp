@@ -25,7 +25,7 @@ std::filesystem::path Config::defaultPath()
         if (appData) CoTaskMemFree(appData);
         throw std::runtime_error("Failed to resolve Roaming AppData folder via SHGetKnownFolderPath");
     }
-    std::filesystem::path dir = std::filesystem::path(appData) / "SpotifyVolumeHotkey";
+    std::filesystem::path dir = std::filesystem::path(appData) / "SpotifyVolumeHotkeys";
     CoTaskMemFree(appData);
     return dir / "config.json";
 }
@@ -60,6 +60,7 @@ AppConfig Config::load()
     if (!file.is_open())
     {
         Logger::error("Failed to open config file for reading: " + m_path.string());
+        m_lastLoadOk = false;
         return config;
     }
 
@@ -67,6 +68,7 @@ AppConfig Config::load()
     {
         json data;
         file >> data;
+        m_lastLoadOk = true;
 
         if (data.contains("client_id") && data["client_id"].is_string())
         {
@@ -102,6 +104,7 @@ AppConfig Config::load()
     catch (const std::exception &e)
     {
         Logger::error(std::string("Failed to parse config JSON: ") + e.what());
+        m_lastLoadOk = false;
     }
 
     return config;
