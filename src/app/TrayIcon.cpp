@@ -135,7 +135,7 @@ int TrayIcon::showPopup(const std::wstring &status, bool autostartEnabled)
     AppendMenuW(menu, MF_STRING | MF_GRAYED, (UINT_PTR)MenuStatus, status.c_str());
     AppendMenuW(menu, MF_SEPARATOR, 0, NULL);
     AppendMenuW(menu, MF_STRING, (UINT_PTR)MenuEditConfig, L"Edit Config...");
-    AppendMenuW(menu, MF_STRING, (UINT_PTR)MenuOpenLogs, L"Open Logs Folder");
+    AppendMenuW(menu, MF_STRING, (UINT_PTR)MenuOpenLogs, L"Open Logs...");
     AppendMenuW(menu, MF_STRING | (autostartEnabled ? MF_CHECKED : 0),
                 (UINT_PTR)MenuToggleAutostart, L"&Start with Windows");
     AppendMenuW(menu, MF_SEPARATOR, 0, NULL);

@@ -155,7 +155,7 @@ void AppController::registerHotkey(const std::string &name, const UINT id)
         Logger::warn("Invalid hotkey: " + reason);
         return;
     }
-    
+
     if (RegisterHotKey(m_window.handle(), id, 0,
                             HotkeyMap::toVk(name)))
     {
@@ -169,7 +169,7 @@ void AppController::registerHotkey(const std::string &name, const UINT id)
         }
         return;
     }
-    
+
     Logger::warn("Hotkey " + name + " in use by another application");
 }
 
@@ -177,7 +177,7 @@ void AppController::onHotkey(WPARAM wParam)
 {
     int id = (int)wParam;
     int step = (id == HOTKEY_VOL_UP) ? VOLUME_CHANGE_STEP : -VOLUME_CHANGE_STEP;
-    
+
     m_pendingVolume += step;
     m_inputDebounceActive = true;
     SetTimer(m_window.handle(), TIMER_INPUT, m_appConfig.inputTimerInterval, NULL);
@@ -226,7 +226,7 @@ void AppController::onInputTimer()
         m_pendingVolume = 0;
         return;
     }
-    
+
     int newVolume = std::clamp(m_currentVolume + m_pendingVolume, 0, 100);
     if (m_volume.setPlayerVolume(newVolume))
     {
@@ -234,7 +234,7 @@ void AppController::onInputTimer()
         m_lastChange = std::chrono::steady_clock::now();
         updateTrayStatus();
     }
-    
+
     m_pendingVolume = 0;
 }
 
@@ -346,7 +346,7 @@ void AppController::handleMenuCommand(int cmd)
         openConfigInEditor();
         break;
     case TrayIcon::MenuOpenLogs:
-        openLogsFolder();
+        openLogsInEditor();
         break;
     case TrayIcon::MenuToggleAutostart:
         toggleAutostart();
@@ -365,14 +365,13 @@ void AppController::handleMenuCommand(int cmd)
 void AppController::openConfigInEditor()
 {
     std::wstring cfg = m_config.path().wstring();
-    ShellExecuteW(NULL, L"open", L"notepad.exe", cfg.c_str(), NULL, SW_SHOWNORMAL);
+    ShellExecuteW(NULL, L"open", cfg.c_str(), NULL, NULL, SW_SHOWNORMAL);
 }
 
-void AppController::openLogsFolder()
+void AppController::openLogsInEditor()
 {
-    std::vector<wchar_t> logPath = Logger::utf16(Logger::getLogFilePath());
-    std::wstring params = L"/select,\"" + std::wstring(logPath.data()) + L"\"";
-    ShellExecuteW(NULL, L"open", L"explorer.exe", params.c_str(), NULL, SW_SHOWNORMAL);
+    std::wstring logStr(Logger::utf16(Logger::getLogFilePath()).data());
+    ShellExecuteW(NULL, L"open", logStr.c_str(), NULL, NULL, SW_SHOWNORMAL);
 }
 
 void AppController::toggleAutostart()

@@ -52,7 +52,7 @@ private:
     void applyConfigReload();
     void handleMenuCommand(int cmd);
     void openConfigInEditor();
-    void openLogsFolder();
+    void openLogsInEditor();
     void toggleAutostart();
     void restartApp();
     void requestExit();
