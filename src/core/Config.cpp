@@ -12,6 +12,14 @@
 
 using json = nlohmann::json;
 
+namespace
+{
+    int sanitizeInterval(int value, int fallback)
+    {
+        return value > 0 ? value : fallback;
+    }
+}
+
 Config::Config()
     : m_path(defaultPath())
 {
@@ -25,7 +33,7 @@ std::filesystem::path Config::defaultPath()
         if (appData) CoTaskMemFree(appData);
         throw std::runtime_error("Failed to resolve Roaming AppData folder via SHGetKnownFolderPath");
     }
-    std::filesystem::path dir = std::filesystem::path(appData) / "SpotifyVolumeHotkeys";
+    std::filesystem::path dir = std::filesystem::path(appData) / "SpotifyVolumeHotkeys/config";
     CoTaskMemFree(appData);
     return dir / "config.json";
 }
@@ -98,6 +106,20 @@ AppConfig Config::load()
                 config.volumeUpKey = hotkeys["volume_up"].get<std::string>();
             }
         }
+        if (data.contains("pollingIntervals") && data["pollingIntervals"].is_object())
+        {
+            const auto &intervals = data["pollingIntervals"];
+            if (intervals.contains("input") && intervals["input"].is_number_integer())
+            {
+                config.inputTimerInterval =
+                    sanitizeInterval(intervals["input"].get<int>(), config.inputTimerInterval);
+            }
+            if (intervals.contains("player") && intervals["player"].is_number_integer())
+            {
+                config.playerTimerInterval =
+                    sanitizeInterval(intervals["player"].get<int>(), config.playerTimerInterval);
+            }
+        }
 
         Logger::debug("Successfully loaded config from " + m_path.string());
     }
@@ -128,6 +150,8 @@ bool Config::save(const AppConfig &config) const
     data["autostart"] = config.autostart;
     data["hotkeys"]["volume_down"] = config.volumeDownKey;
     data["hotkeys"]["volume_up"] = config.volumeUpKey;
+    data["pollingIntervals"]["input"] = config.inputTimerInterval;
+    data["pollingIntervals"]["player"] = config.playerTimerInterval;
 
     auto parent = m_path.parent_path();
     if (!parent.empty())

@@ -48,7 +48,7 @@ bool AppController::startup(HINSTANCE hInstance)
     }
 
     applyHotkeys();
-    SetTimer(m_window.handle(), TIMER_PLAYER, PLAYER_TIMER_INTERVAL, NULL);
+    SetTimer(m_window.handle(), TIMER_PLAYER, m_appConfig.playerTimerInterval, NULL);
     SetTimer(m_window.handle(), TIMER_CONFIG, CONFIG_TIMER_INTERVAL, NULL);
 
     m_tray.configure(m_window.handle(), hInstance, WM_TRAY_CALLBACK);
@@ -159,7 +159,14 @@ void AppController::registerHotkey(const std::string &name, const UINT id)
     if (RegisterHotKey(m_window.handle(), id, 0,
                             HotkeyMap::toVk(name)))
     {
-        m_hotkeyUpRegistered = true;
+        if (id == HOTKEY_VOL_DOWN)
+        {
+            m_hotkeyDownRegistered = true;
+        }
+        else
+        {
+            m_hotkeyUpRegistered = true;
+        }
         return;
     }
     
@@ -173,7 +180,7 @@ void AppController::onHotkey(WPARAM wParam)
     
     m_pendingVolume += step;
     m_inputDebounceActive = true;
-    SetTimer(m_window.handle(), TIMER_INPUT, INPUT_TIMER_INTERVAL, NULL);
+    SetTimer(m_window.handle(), TIMER_INPUT, m_appConfig.inputTimerInterval, NULL);
 }
 
 void AppController::updateCurrentVolume()
@@ -270,12 +277,29 @@ void AppController::applyConfigReload()
     bool credsChanged = fresh.clientId != m_appConfig.clientId ||
                         fresh.clientSecret != m_appConfig.clientSecret;
     bool autostartChanged = fresh.autostart != m_appConfig.autostart;
+    bool intervalsChanged = fresh.inputTimerInterval != m_appConfig.inputTimerInterval ||
+                            fresh.playerTimerInterval != m_appConfig.playerTimerInterval;
 
     if (hotkeysChanged)
     {
         m_appConfig.volumeDownKey = fresh.volumeDownKey;
         m_appConfig.volumeUpKey = fresh.volumeUpKey;
         applyHotkeys();
+    }
+
+    if (intervalsChanged)
+    {
+        m_appConfig.inputTimerInterval = fresh.inputTimerInterval;
+        m_appConfig.playerTimerInterval = fresh.playerTimerInterval;
+
+        KillTimer(m_window.handle(), TIMER_PLAYER);
+        SetTimer(m_window.handle(), TIMER_PLAYER, m_appConfig.playerTimerInterval, NULL);
+
+        if (m_inputDebounceActive)
+        {
+            KillTimer(m_window.handle(), TIMER_INPUT);
+            SetTimer(m_window.handle(), TIMER_INPUT, m_appConfig.inputTimerInterval, NULL);
+        }
     }
 
     if (credsChanged)
@@ -295,9 +319,9 @@ void AppController::applyConfigReload()
         }
     }
 
-    if (hotkeysChanged || credsChanged || autostartChanged)
+    if (hotkeysChanged || credsChanged || autostartChanged || intervalsChanged)
     {
-        Logger::info("Config file changed; credentials, hotkeys and autostart reloaded.");
+        Logger::info("Config file changed; credentials, hotkeys, autostart and polling intervals reloaded.");
     }
 }
 

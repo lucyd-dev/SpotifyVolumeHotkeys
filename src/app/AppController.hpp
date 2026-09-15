@@ -26,8 +26,6 @@ public:
     static constexpr UINT_PTR TIMER_INPUT = 1;
     static constexpr UINT_PTR TIMER_PLAYER = 2;
     static constexpr UINT_PTR TIMER_CONFIG = 3;
-    static const UINT INPUT_TIMER_INTERVAL = 250;
-    static const UINT PLAYER_TIMER_INTERVAL = 5000;
     static const UINT CONFIG_TIMER_INTERVAL = 2000;
     static const UINT WM_TRAY_CALLBACK = WM_APP + 1;
     static const int VOLUME_CHANGE_STEP = 2;

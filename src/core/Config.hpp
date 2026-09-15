@@ -11,6 +11,8 @@ struct AppConfig
     std::string volumeDownKey = "F13";
     std::string volumeUpKey = "F14";
     bool autostart = true;
+    int inputTimerInterval = 250;
+    int playerTimerInterval = 5000;
 };
 
 class Config

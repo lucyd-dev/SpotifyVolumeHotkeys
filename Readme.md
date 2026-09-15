@@ -14,8 +14,8 @@ A lightweight, background Windows system tray utility to control Spotify volume 
 > [!NOTE]
 > The first-run setup wizard is still a work in progress.
 
-> [!WARNING]
-> Spotify's API is heavily rate-limited, which makes smooth (continuous) volume changes impossible. Volume changes are therefore sent deferred by a quarter of a second, and player data (active device, current volume) is polled every 5 seconds.
+> [!IMPORTANT]
+> Experience is not buttery smooth as wanted, thats due to Spotify's API being heavily rate-limited. See the [Rate Limiting](#rate-limiting) section below.
 
 ---
 
@@ -74,12 +74,37 @@ You can edit configuration at any time by selecting **Edit Config & Hotkeys** fr
   "hotkeys": {
     "volume_down": "F13",
     "volume_up": "F14"
+  },
+  "pollingIntervals": {
+    "input": 250,
+    "player": 5000
   }
 }
 ```
 
 ---
 
+## Rate Limiting
+
+Spotify's Web API is heavily rate-limited, which makes smooth (continuous) volume changes impossible. This app works around it by:
+
+- **Deferring volume changes** by a quarter of a second (`pollingIntervals.input`, default `250` ms) so rapid hotkey presses are batched into a single call.
+- **Polling player data** (active device, current volume) only every 5 seconds (`pollingIntervals.player`, default `5000` ms).
+
+Both intervals are configurable via `pollingIntervals` in `config.json` and are hot-reloaded when you save the file. Lowering them makes volume changes feel more responsive, but **at your own risk**: Spotify may answer with HTTP `429 Too Many Requests`, which stops all API calls until Spotify's `Retry-After` period has passed.
+
+To check whether you are being rate-limited, watch the log file (`%APPDATA%\SpotifyVolumeHotkeys\spotify_volume_hotkeys.log`, or use **Open Logs** from the tray menu) for `WARN` messages starting with:
+
+```
+429 Too Many Requests from ...
+```
+
+If you see these, raise the intervals again (or restore the defaults) to avoid long cool-down periods.
+
+---
+
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
+
+`Made with 💜 by Lucyd since 2026`
