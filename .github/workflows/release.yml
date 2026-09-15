@@ -17,30 +17,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup MSYS2 / MinGW
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: mingw64
-          install: mingw-w64-x86_64-toolchain make
+      - name: Setup CMake and Ninja
+        uses: lukka/get-cmake@latest
 
-      - name: Configure CMake (Release)
-        shell: msys2 {0}
-        run: |
-          cmake -S . -B build \
-            -G "MinGW Makefiles" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DVCPKG_TARGET_TRIPLET=x64-mingw-w64 \
-            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
 
-      - name: Build
-        shell: msys2 {0}
-        run: cmake --build build --config Release --parallel
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+
+      - name: Configure (VS preset)
+        run: cmake --preset windows-vs
+
+      - name: Build (Release)
+        run: cmake --build --preset release
 
       - name: Stage release assets
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path staging
-          Copy-Item build\SpotifyVolumeHotkey.exe, build\*.dll staging\
+          Copy-Item build\windows-vs\Release\SpotifyVolumeHotkey.exe, build\windows-vs\Release\*.dll staging\
 
       - name: Bundle zip
         shell: pwsh

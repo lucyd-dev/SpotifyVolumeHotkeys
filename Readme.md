@@ -6,7 +6,7 @@ A lightweight, background Windows system tray utility to control Spotify volume 
 
 - **Volume hotkeys from anywhere:** Press `F13` and `F14` (customizable) to lower and raise Spotify's volume while using any application.
 - **Runs quietly in the background:** No windows, no terminal — just a small icon in your system tray.
-- **System tray menu:** Left or Right-click the tray icon to see the current status, edit your settings, open the logs folder, toggle starting with Windows, restart, or exit.
+- **System tray menu:** Left or Right-click the tray icon to see the current status, edit your settings, open the logs, toggle starting with Windows, restart, or exit.
 - **Start with Windows:** Optional autostart so your hotkeys are always ready after a reboot.
 - **Edit settings without restarting:** Save changes to your config file and they take effect automatically.
 - **First-run setup wizard:** Walking you through connecting to Spotify and setting your hotkeys.
@@ -22,7 +22,7 @@ A lightweight, background Windows system tray utility to control Spotify volume 
 ## Prerequisites
 
 - **OS:** Windows 10 or Windows 11 (64-bit)
-- **Compiler:** MSVC with C++20 support (Visual Studio 2022 / 2026 or Build Tools)
+- **Compiler:** MSVC with C++20 support (Windows Build Tools 2026)
 - **Build System:** [CMake](https://cmake.org/download/) (v3.20+)
 - **Package Manager:** [vcpkg](https://github.com/microsoft/vcpkg)
 
@@ -30,26 +30,35 @@ A lightweight, background Windows system tray utility to control Spotify volume 
 
 ## Building from Source
 
-This project uses **vcpkg Manifest Mode** (`vcpkg.json`). Dependencies (`cpp-httplib`, `nlohmann-json`) are automatically fetched and built during CMake configuration.
+This project uses **CMake Presets** and **vcpkg Manifest Mode** (`vcpkg.json`). Dependencies (`cpp-httplib`, `nlohmann-json`) are automatically fetched and built during CMake configuration. The preset-based setup is also used by the CI release workflow, so local and remote builds stay in sync.
 
-1. **Clone the repository:**
-   ```powershell
-   git clone [https://github.com/](https://github.com/)<YourUsername>/SpotifyVolumeHotkeys.git
-   cd SpotifyVolumeHotkeys
-   ```
+### Prerequisites
 
-2. **Configure CMake:**
-   Set the `CMAKE_TOOLCHAIN_FILE` to your local vcpkg toolchain path:
-   ```powershell
-   cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
-   ```
+- Set the `VCPKG_ROOT` environment variable to your local [vcpkg](https://github.com/microsoft/vcpkg) checkout (e.g. `C:\vcpkg`).
+  In VS Code you can instead add it to your local `.vscode/settings.json`:
+  ```json
+  {
+    "cmake.environment": {
+      "VCPKG_ROOT": "C:/vcpkg"
+    }
+  }
+  ```
 
-3. **Build Release Binary:**
-   ```powershell
-   cmake --build build --config Release
-   ```
+### Visual Studio Code (recommended)
 
-The compiled binary will be located at `build/Release/spotifyVolumeHotkeys.exe`.
+1. Open the repository in VS Code with the [CMake Tools](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cmake-tools) extension installed.
+2. Run **CMake: Select Configure Preset** (`Ctrl+Shift+P`) and choose `Windows (MSVC Visual Studio)`.
+3. Press `Ctrl+Shift+B` or run **CMake: Build**.
+4. To switch between Debug and Release, click the build variant label (e.g. `Debug`) in the VS Code status bar and pick `Release`, then press `Ctrl+Shift+B` again.
+
+### Command line
+
+```powershell
+cmake --preset windows-vs
+cmake --build --preset release
+```
+
+The compiled binary will be located at `build/windows-vs/Release/SpotifyVolumeHotkey.exe`.
 
 ---
 
