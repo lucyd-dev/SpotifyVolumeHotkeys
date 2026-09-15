@@ -33,7 +33,7 @@ std::filesystem::path Config::defaultPath()
         if (appData) CoTaskMemFree(appData);
         throw std::runtime_error("Failed to resolve Roaming AppData folder via SHGetKnownFolderPath");
     }
-    std::filesystem::path dir = std::filesystem::path(appData) / "SpotifyVolumeHotkeys/config";
+    std::filesystem::path dir = std::filesystem::path(appData) / "SpotifyVolumeHotkeys";
     CoTaskMemFree(appData);
     return dir / "config.json";
 }
