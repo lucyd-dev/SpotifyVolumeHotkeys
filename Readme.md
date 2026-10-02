@@ -1,4 +1,4 @@
-# Spotify Volume Hotkeys
+# <img src="assets/svh.ico" width="24" alt="Spotify Volume Hotkeys Icon"> Spotify Volume Hotkeys
 
 A lightweight, background Windows system tray utility to control Spotify volume globally via custom hotkeys (defaulting to `F13` and `F14`).
 

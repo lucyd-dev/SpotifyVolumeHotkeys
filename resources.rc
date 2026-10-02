@@ -1,4 +1,4 @@
 #include "include/resource.h"
 
 CACERT_PEM RCDATA "include/certs/cacert.pem"
-IDI_APPICON ICON "assets/tray.ico"
+IDI_APPICON ICON "assets/svh.ico"
