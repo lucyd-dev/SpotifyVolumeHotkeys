@@ -9,6 +9,7 @@
 #include "core/Config.hpp"
 #include "auth/Auth.hpp"
 #include "app/AppController.hpp"
+#include "app/ConsoleWizard.hpp"
 
 const std::string REDIRECT_URI = "http://127.0.0.1:8888/callback";
 
@@ -33,22 +34,61 @@ int wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int)
         Logger::setLogFile(logPath.string());
         Logger::cleanupLogFile();
 
+        AppConfig appConfig = config.load();
+
+        ConsoleWizard wizard;
+        struct WizardGuard
+        {
+            ConsoleWizard &wizard;
+            ~WizardGuard() { wizard.detach(); }
+        } wizardGuard{wizard};
+
+        const bool needsWizard = appConfig.clientId.empty() || appConfig.clientSecret.empty();
+        if (needsWizard)
+        {
+            if (!wizard.begin())
+            {
+                return 1;
+            }
+        }
+
         if (!HttpClient::init())
         {
+            Logger::setShowDialogs(true);
             Logger::fatal("HttpClient initialization failed.");
+            wizard.detach();
             return 1;
         }
 
-        AppConfig appConfig = config.load();
+        if (needsWizard)
+        {
+            wizard.collect(appConfig, REDIRECT_URI);
+        }
 
         Logger::info("Initializing authentication...");
         Auth auth(REDIRECT_URI);
+        if (needsWizard)
+        {
+            auth.applyConfig(appConfig);
+        }
         if (!auth.authenticate())
         {
+            Logger::setShowDialogs(true);
             Logger::fatal("Auth failed.");
+            wizard.detach();
             return 1;
         }
         Logger::info("Authentication successful!");
+
+        if (needsWizard && !wizard.complete(appConfig, config))
+        {
+            Logger::setShowDialogs(true);
+            Logger::fatal("Failed to save the configuration file.");
+            wizard.detach();
+            return 1;
+        }
+
+        wizard.detach();
 
         AppController controller(appConfig, auth);
         if (!controller.startup(hInstance))

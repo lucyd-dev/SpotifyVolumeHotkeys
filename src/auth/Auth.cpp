@@ -20,11 +20,20 @@ Auth::Auth(std::string redirectUri)
 bool Auth::authenticate()
 {
     AppConfig appConfig = m_config.load();
-    m_clientId = std::move(appConfig.clientId);
-    m_clientSecret = std::move(appConfig.clientSecret);
+    if (m_clientId.empty())
+    {
+        m_clientId = std::move(appConfig.clientId);
+    }
+    if (m_clientSecret.empty())
+    {
+        m_clientSecret = std::move(appConfig.clientSecret);
+    }
     {
         std::lock_guard<std::mutex> lock(m_tokenMutex);
-        m_refreshToken = std::move(appConfig.refreshToken);
+        if (m_refreshToken.empty())
+        {
+            m_refreshToken = std::move(appConfig.refreshToken);
+        }
     }
 
     if (m_clientId.empty() || m_clientSecret.empty())

@@ -19,7 +19,6 @@ namespace Logger
     std::string getLogFilePath();
     void cleanupLogFile();
     void setShowDialogs(bool show);
-    void setConsoleActive(bool active);
     const char *levelToString(Level level);
     void logMessage(Level level, std::string_view msg);
     std::vector<wchar_t> utf16(const std::string &utf8);

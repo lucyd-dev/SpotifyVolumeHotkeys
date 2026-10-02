@@ -1,5 +1,4 @@
 #include "Logger.hpp"
-#include <iostream>
 #include <fstream>
 #include <string>
 #include <chrono>
@@ -14,7 +13,6 @@
 static std::string logFile = "";
 static std::mutex logMutex;
 static bool showDialogs = true;
-static bool consoleActive = true;
 
 static void saveToLog(const std::string &entry) {
     if (!logFile.empty())
@@ -55,11 +53,6 @@ namespace Logger
     void setShowDialogs(bool show)
     {
         showDialogs = show;
-    }
-
-    void setConsoleActive(bool active)
-    {
-        consoleActive = active;
     }
 
     void cleanupLogFile()
@@ -156,10 +149,6 @@ namespace Logger
 
         std::string formatted = entry.str();
 
-        if (consoleActive)
-        {
-            std::cout << formatted << std::endl;
-        }
         saveToLog(formatted);
     }
 }

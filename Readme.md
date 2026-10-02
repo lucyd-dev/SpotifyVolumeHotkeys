@@ -10,9 +10,7 @@ A lightweight, background Windows system tray utility to control Spotify volume 
 - **Start with Windows:** Optional autostart so your hotkeys are always ready after a reboot.
 - **Edit settings without restarting:** Save changes to your config file and they take effect automatically.
 - **First-run setup wizard:** Walking you through connecting to Spotify and setting your hotkeys.
-
-> [!NOTE]
-> The first-run setup wizard is still a work in progress.
+- **Logs in one place:** All output goes to `%APPDATA%\SpotifyVolumeHotkeys\spotify_volume_hotkeys.log`; open it from **Open Logs...** in the tray menu.
 
 > [!IMPORTANT]
 > Experience is not buttery smooth as wanted, thats due to Spotify's API being heavily rate-limited. See the [Rate Limiting](#rate-limiting) section below.
@@ -64,15 +62,48 @@ The compiled binary will be located at `build/windows-vs/Release/SpotifyVolumeHo
 
 ## Setup & Configuration
 
-1. Create an webAPI application in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
-2. Set the Redirect URI to `http://localhost:8888/callback`.
-3. Launch `spotifyVolumeHotkeys.exe`.
-4. On first launch, a console wizard will ask for your **Client ID**, **Client Secret**, and desired volume keys (defaults to `F13` / `F14`).
-5. After authentication, the console closes and the app docks quietly into your Windows System Tray.
+You never have to touch a config file to get started. On the first launch a friendly
+**setup wizard** opens in a console, guides you through connecting to Spotify, and then
+gets out of the way, leaving the app running entirely in the system tray.
 
-### Manual Configuration
-You can edit configuration at any time by selecting **Edit Config & Hotkeys** from the tray icon or by opening:
-`%APPDATA%\SpotifyVolumeHotkeys\config.json`
+### First-time setup (guided wizard)
+
+1. **Launch the app.** Double-click `SpotifyVolumeHotkey.exe`, or start it from a
+   terminal if you prefer.
+2. **Follow the wizard.** It walks you through each step and validates your answers, so
+   you can just read the prompts and press Enter:
+   - **Create a Spotify app:** before opening your browser, the wizard lists exactly what
+     to do on the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard):
+     create an app and paste the **Redirect URI** it shows on screen. It then offers to
+     open the dashboard for you (`Open the dashboard in your browser now [Y/n]`).
+   - **Enter your credentials:** paste the app's **Client ID** and **Client Secret**.
+   - **Choose your hotkeys:** pick the volume-down and volume-up keys (defaults `F13` /
+     `F14`). Valid keys are `A`-`Z`, `0`-`9`, `F1`-`F24`, `Space`, and the arrow keys;
+     press Enter to accept the suggested default.
+   - **Choose startup behaviour:** decide whether the app should start automatically with
+     Windows (default yes).
+3. **Log in to Spotify.** A browser window opens; approve access. The wizard confirms
+   success, the console closes, and the app docks into your system tray.
+
+> [!NOTE]
+> Your credentials are only saved after a successful login. If you close the wizard early
+> or authentication fails, just launch the app again and it will ask for them.
+
+### Everyday use (tray menu)
+
+Once set up, there is no window to manage, only the tray icon:
+
+- **Left- or right-click the tray icon** to open the menu.
+- The top entry shows the current status, e.g. `Player active · 42%`, `No active device`,
+  or `Rate limited`.
+- From the menu you can **Edit Config...**, **Open Logs...**, toggle **Start with
+  Windows**, **Restart**, or **Exit**.
+- Use your hotkeys from any application to change Spotify's volume.
+
+### Manual configuration
+
+Prefer editing files? Choose **Edit Config...** from the tray menu, or open
+`%APPDATA%\SpotifyVolumeHotkeys\config.json` directly:
 
 ```json
 {
@@ -90,6 +121,9 @@ You can edit configuration at any time by selecting **Edit Config & Hotkeys** fr
   }
 }
 ```
+
+While the app is running, saving changes to `config.json` (credentials, hotkeys,
+autostart, polling intervals) is detected automatically and applied without a restart.
 
 ---
 
