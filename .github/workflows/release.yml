@@ -28,11 +28,25 @@ jobs:
         env:
           VCPKG_BINARY_SOURCES: default,rw
 
+      - name: Compute vcpkg dependency hash
+        id: vcpkg-hash
+        shell: pwsh
+        run: |
+          $json = Get-Content vcpkg.json -Raw | ConvertFrom-Json
+          $relevant = [ordered]@{
+            baseline     = $json.'builtin-baseline'
+            dependencies = $json.dependencies
+          } | ConvertTo-Json -Compress -Depth 10
+          $sha = [System.BitConverter]::ToString(
+            [System.Security.Cryptography.SHA256]::Create().ComputeHash(
+              [System.Text.Encoding]::UTF8.GetBytes($relevant))).Replace('-', '').ToLower()
+          "hash=$sha" >> $env:GITHUB_OUTPUT
+
       - name: Restore vcpkg binary cache
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: ${{ runner.os }}-vcpkg-binary-${{ hashFiles('vcpkg.json') }}
+          key: ${{ runner.os }}-vcpkg-binary-${{ steps.vcpkg-hash.outputs.hash }}
           restore-keys: |
             ${{ runner.os }}-vcpkg-binary-
 
