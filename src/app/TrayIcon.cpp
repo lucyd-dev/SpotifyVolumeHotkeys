@@ -124,19 +124,27 @@ void TrayIcon::setStatus(const std::wstring &status)
     }
 }
 
-int TrayIcon::showPopup(const std::wstring &status, bool autostartEnabled)
+int TrayIcon::showPopup(const MenuState &state)
 {
     if (!m_hwnd)
     {
         return 0;
     }
 
+    std::wstring updateLabel = state.updateLabel;
+    if (updateLabel.empty())
+    {
+        updateLabel = L"Check for Updates...";
+    }
+
     HMENU menu = CreatePopupMenu();
-    AppendMenuW(menu, MF_STRING | MF_GRAYED, (UINT_PTR)MenuStatus, status.c_str());
+    AppendMenuW(menu, MF_STRING | MF_GRAYED, (UINT_PTR)MenuStatus, state.status.c_str());
     AppendMenuW(menu, MF_SEPARATOR, 0, NULL);
+    AppendMenuW(menu, MF_STRING, (UINT_PTR)MenuCheckUpdate, updateLabel.c_str());
     AppendMenuW(menu, MF_STRING, (UINT_PTR)MenuEditConfig, L"Edit Config...");
     AppendMenuW(menu, MF_STRING, (UINT_PTR)MenuOpenLogs, L"Open Logs...");
-    AppendMenuW(menu, MF_STRING | (autostartEnabled ? MF_CHECKED : 0),
+    AppendMenuW(menu, MF_STRING, (UINT_PTR)MenuOpenGitHub, L"GitHub Repository...");
+    AppendMenuW(menu, MF_STRING | (state.autostartEnabled ? MF_CHECKED : 0),
                 (UINT_PTR)MenuToggleAutostart, L"&Start with Windows");
     AppendMenuW(menu, MF_SEPARATOR, 0, NULL);
     AppendMenuW(menu, MF_STRING, (UINT_PTR)MenuRestart, L"Restart");

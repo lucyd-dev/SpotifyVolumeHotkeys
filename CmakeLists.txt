@@ -1,6 +1,22 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(SpotifyVolumeHotkey CXX)
+# Single source of truth for the version: default to vcpkg.json's
+# version-string, but allow the release workflow to override it with
+# -DSVH_VERSION=<git tag>.
+set(SVH_VERSION "" CACHE STRING "Application version; defaults to vcpkg.json version-string")
+if(NOT SVH_VERSION)
+    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg.json" _svh_vcpkg_json)
+    string(JSON SVH_VERSION ERROR_VARIABLE _svh_json_error
+           GET "${_svh_vcpkg_json}" version-string)
+    if(NOT _svh_json_error STREQUAL "NOTFOUND" AND NOT _svh_json_error STREQUAL "")
+        message(WARNING "Could not read version from vcpkg.json (${_svh_json_error}); "
+                        "falling back to 0.0.0")
+        set(SVH_VERSION "0.0.0")
+    endif()
+endif()
+string(REGEX REPLACE "^[vV]" "" SVH_VERSION "${SVH_VERSION}")
+
+project(SpotifyVolumeHotkey VERSION ${SVH_VERSION} LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -13,9 +29,16 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
     "src/*.h"
 )
 
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/version.rc.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/version.rc"
+    @ONLY
+)
+
 add_executable(${PROJECT_NAME}
     ${SOURCES}
     resources.rc
+    "${CMAKE_CURRENT_BINARY_DIR}/version.rc"
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
@@ -28,6 +51,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
     CPPHTTPLIB_OPENSSL_SUPPORT
     _WIN32_WINNT=0x0A00
     WINVER=0x0A00
+    SVH_VERSION_STRING="${PROJECT_VERSION}"
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE

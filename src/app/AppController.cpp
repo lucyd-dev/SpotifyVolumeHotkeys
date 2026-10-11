@@ -2,6 +2,7 @@
 #include "HiddenWindow.hpp"
 #include "HotkeyMap.hpp"
 #include "Autostart.hpp"
+#include "Version.hpp"
 #include "../core/Logger.hpp"
 #include <vector>
 
@@ -11,9 +12,22 @@
 #include <algorithm>
 #include <chrono>
 #include <string>
+#include <thread>
 
-AppController::AppController(AppConfig config, Auth &auth)
+namespace
+{
+    constexpr const char *REPO_OWNER = "lucyd-dev";
+    constexpr const char *REPO_NAME = "SpotifyVolumeHotkeys";
+    constexpr const char *REPO_URL = "https://github.com/lucyd-dev/SpotifyVolumeHotkeys";
+    constexpr const char *RELEASES_URL =
+        "https://github.com/lucyd-dev/SpotifyVolumeHotkeys/releases/latest";
+    constexpr int UPDATE_SETTLE_STEPS = 30; // 30 x 100ms = ~3s of startup settling
+    constexpr int UPDATE_SETTLE_STEP_MS = 100;
+}
+
+AppController::AppController(AppConfig config, Auth &auth, AppOptions options)
     : m_appConfig(std::move(config)),
+      m_options(std::move(options)),
       m_auth(auth),
       m_volume(auth),
       m_currentVolume(-1),
@@ -59,6 +73,9 @@ bool AppController::startup(HINSTANCE hInstance)
 
     updateCurrentVolume();
     updateTrayStatus();
+
+    Logger::info(std::string("SpotifyVolumeHotkeys v") + Version::String);
+    startUpdateCheck(m_options.forceCheck);
     return true;
 }
 
@@ -75,6 +92,12 @@ AppController::ExitAction AppController::run()
 
 void AppController::shutdown()
 {
+    m_updateStop = true;
+    if (m_updateThread.joinable())
+    {
+        m_updateThread.join();
+    }
+
     KillTimer(m_window.handle(), TIMER_INPUT);
     KillTimer(m_window.handle(), TIMER_PLAYER);
     KillTimer(m_window.handle(), TIMER_CONFIG);
@@ -129,6 +152,10 @@ bool AppController::handleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
 
     case WM_APP_HOOK_KEY:
         onHookKey(wParam);
+        return true;
+
+    case WM_APP_UPDATE_RESULT:
+        onUpdateResult();
         return true;
 
     default:
@@ -374,7 +401,13 @@ void AppController::onTrayCallback(LPARAM lParam)
     UINT event = LOWORD(lParam);
     if (event == WM_LBUTTONUP  || event == WM_RBUTTONUP)
     {
-        int cmd = m_tray.showPopup(m_statusText, m_autostartEnabled);
+        TrayIcon::MenuState state;
+        state.status = m_statusText;
+        state.autostartEnabled = m_autostartEnabled;
+        state.updateAvailable = m_updateAvailable;
+        state.updateLabel = updateMenuLabel();
+
+        int cmd = m_tray.showPopup(state);
         if (cmd > 0)
         {
             handleMenuCommand(cmd);
@@ -392,8 +425,24 @@ void AppController::handleMenuCommand(int cmd)
     case TrayIcon::MenuOpenLogs:
         openLogsInEditor();
         break;
+    case TrayIcon::MenuOpenGitHub:
+    {
+        std::vector<wchar_t> url = Logger::utf16(REPO_URL);
+        ShellExecuteW(NULL, L"open", url.data(), NULL, NULL, SW_SHOWNORMAL);
+        break;
+    }
     case TrayIcon::MenuToggleAutostart:
         toggleAutostart();
+        break;
+    case TrayIcon::MenuCheckUpdate:
+        if (m_updateAvailable)
+        {
+            openReleasePage();
+        }
+        else
+        {
+            startUpdateCheck(true);
+        }
         break;
     case TrayIcon::MenuRestart:
         restartApp();
@@ -446,4 +495,159 @@ void AppController::requestExit()
 {
     m_exitAction = ExitAction::Exit;
     PostQuitMessage(0);
+}
+
+void AppController::startUpdateCheck(bool manual)
+{
+    if (m_updateRunning.load())
+    {
+        return; // a check is already in flight
+    }
+    if (m_updateThread.joinable())
+    {
+        m_updateThread.join(); // reap the previous, completed worker
+    }
+
+    m_manualCheck = manual;
+    m_updateStop = false;
+    m_updateRunning = true;
+
+    m_updateThread = std::thread([this]()
+    {
+        struct RunningGuard
+        {
+            std::atomic<bool> &flag;
+            ~RunningGuard() { flag = false; }
+        } guard{m_updateRunning};
+
+        // Let auth/UI settle before touching the network on ordinary startup.
+        // Simulated checks skip the wait so testing stays snappy.
+        if (m_options.simulateUpdateVersion.empty())
+        {
+            for (int i = 0; i < UPDATE_SETTLE_STEPS && !m_updateStop.load(); ++i)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(UPDATE_SETTLE_STEP_MS));
+            }
+            if (m_updateStop.load())
+            {
+                return;
+            }
+        }
+
+        UpdateChecker::Result result;
+        if (!m_options.simulateUpdateVersion.empty())
+        {
+            result.status = UpdateChecker::Result::Status::UpdateAvailable;
+            result.currentVersion = Version::String;
+            result.latestVersion = m_options.simulateUpdateVersion;
+            result.releaseUrl = RELEASES_URL;
+            Logger::info("Update check simulated: pretending v" +
+                         m_options.simulateUpdateVersion + " is available.");
+        }
+        else
+        {
+            result = UpdateChecker::checkLatest(REPO_OWNER, REPO_NAME, Version::String);
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(m_updateMutex);
+            m_updateResult = result;
+        }
+
+        if (!m_updateStop.load())
+        {
+            PostMessageW(m_window.handle(), WM_APP_UPDATE_RESULT, 0, 0);
+        }
+    });
+}
+
+void AppController::onUpdateResult()
+{
+    UpdateChecker::Result result;
+    {
+        std::lock_guard<std::mutex> lock(m_updateMutex);
+        result = m_updateResult;
+    }
+
+    switch (result.status)
+    {
+    case UpdateChecker::Result::Status::Failed:
+        Logger::debug("Update check failed: " + result.detail);
+        if (m_manualCheck)
+        {
+            std::string text = "Could not check for updates.\n\n" + result.detail;
+            std::vector<wchar_t> wtext = Logger::utf16(text);
+            MessageBoxW(m_window.handle(), wtext.data(),
+                        L"Spotify Volume Hotkeys \u2014 Update Check",
+                        MB_OK | MB_ICONWARNING | MB_TOPMOST);
+        }
+        break;
+
+    case UpdateChecker::Result::Status::UpToDate:
+        Logger::info("Update check: already on the latest version (v" +
+                     std::string(Version::String) + ").");
+        if (m_manualCheck)
+        {
+            std::string text = "You are running the latest version (v" +
+                               std::string(Version::String) + ").";
+            std::vector<wchar_t> wtext = Logger::utf16(text);
+            MessageBoxW(m_window.handle(), wtext.data(),
+                        L"Spotify Volume Hotkeys \u2014 Update Check",
+                        MB_OK | MB_ICONINFORMATION | MB_TOPMOST);
+        }
+        break;
+
+    case UpdateChecker::Result::Status::UpdateAvailable:
+        m_updateAvailable = true;
+        m_updateLatest = result.latestVersion;
+        m_updateUrl = result.releaseUrl;
+        Logger::info("Update available: v" + m_updateLatest + " (running v" +
+                     std::string(Version::String) + ").");
+        if (!m_updateDismissed || m_manualCheck)
+        {
+            showUpdatePrompt();
+        }
+        break;
+    }
+}
+
+void AppController::showUpdatePrompt()
+{
+    std::string text = "A new version of Spotify Volume Hotkeys is available.\n\n"
+                       "Installed: v" + std::string(Version::String) + "\n"
+                       "Latest:    v" + m_updateLatest + "\n\n"
+                       "Open the download page now?";
+
+    std::vector<wchar_t> wtext = Logger::utf16(text);
+    const int choice = MessageBoxW(m_window.handle(), wtext.data(),
+                                   L"Spotify Volume Hotkeys \u2014 Update Available",
+                                   MB_YESNO | MB_ICONINFORMATION | MB_TOPMOST);
+    if (choice == IDYES)
+    {
+        openReleasePage();
+    }
+    else
+    {
+        m_updateDismissed = true; // suppress only for this session
+    }
+}
+
+void AppController::openReleasePage()
+{
+    if (m_updateUrl.empty())
+    {
+        return;
+    }
+
+    std::vector<wchar_t> url = Logger::utf16(m_updateUrl);
+    ShellExecuteW(NULL, L"open", url.data(), NULL, NULL, SW_SHOWNORMAL);
+}
+
+std::wstring AppController::updateMenuLabel() const
+{
+    if (!m_updateAvailable)
+    {
+        return L"Check for Updates...";
+    }
+    return L"Update to v" + std::wstring(m_updateLatest.begin(), m_updateLatest.end()) + L"...";
 }

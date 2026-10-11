@@ -13,9 +13,19 @@ public:
         MenuStatus = 0,
         MenuEditConfig,
         MenuOpenLogs,
+        MenuOpenGitHub,
         MenuToggleAutostart,
+        MenuCheckUpdate,
         MenuRestart,
         MenuExit,
+    };
+
+    struct MenuState
+    {
+        std::wstring status;
+        bool autostartEnabled = false;
+        bool updateAvailable = false;
+        std::wstring updateLabel; // e.g. L"Update to v0.2.4..."
     };
 
     TrayIcon();
@@ -25,7 +35,7 @@ public:
     void remove();
 
     void setStatus(const std::wstring &status);
-    int showPopup(const std::wstring &status, bool autostartEnabled);
+    int showPopup(const MenuState &state);
 
 private:
     HWND m_hwnd;

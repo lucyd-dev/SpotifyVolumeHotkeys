@@ -6,7 +6,8 @@ A lightweight, background Windows system tray utility to control Spotify volume 
 
 - **Volume hotkeys from anywhere:** Press the keyboard's native volume-down/up keys (customizable, defaults `VolumeDown`/`VolumeUp`) to lower and raise Spotify's volume while using any application.
 - **Runs quietly in the background:** No windows, no terminal — just a small icon in your system tray.
-- **System tray menu:** Left or Right-click the tray icon to see the current status, edit your settings, open the logs, toggle starting with Windows, restart, or exit.
+- **System tray menu:** Left or Right-click the tray icon to see the current status, check for updates, edit your settings, open the logs, toggle starting with Windows, restart, or exit.
+- **Update notifications:** On startup the app quietly checks GitHub for a newer release and offers to open the download page, both in a dialog and via the tray menu.
 - **Start with Windows:** Optional autostart so your hotkeys are always ready after a reboot.
 - **Edit settings without restarting:** Save changes to your config file and they take effect automatically.
 - **First-run setup wizard:** Walking you through connecting to Spotify and setting your hotkeys.
@@ -97,7 +98,8 @@ Once set up, there is no window to manage, only the tray icon:
 - **Left- or right-click the tray icon** to open the menu.
 - The top entry shows the current status, e.g. `Player active · 42%`, `No active device`,
   or `Rate limited`.
-- From the menu you can **Edit Config...**, **Open Logs...**, toggle **Start with
+- From the menu you can **Check for Updates...** (or **Update to vX.Y.Z...** when a newer
+  release is known), **Edit Config...**, **Open Logs...**, toggle **Start with
   Windows**, **Restart**, or **Exit**.
 - Use your hotkeys from any application to change Spotify's volume.
 

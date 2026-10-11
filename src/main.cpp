@@ -13,8 +13,53 @@
 
 const std::string REDIRECT_URI = "http://127.0.0.1:8888/callback";
 
+namespace
+{
+    AppOptions parseOptions()
+    {
+        AppOptions options;
+
+        int argc = 0;
+        LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+        if (!argv)
+        {
+            return options;
+        }
+
+        for (int i = 1; i < argc; ++i)
+        {
+            const std::wstring arg = argv[i];
+            if (arg == L"--check-update")
+            {
+                options.forceCheck = true;
+            }
+            else if (arg.rfind(L"--simulate-update", 0) == 0)
+            {
+                options.simulateUpdateVersion = "9.9.9";
+                const std::size_t eq = arg.find(L'=');
+                if (eq != std::wstring::npos && eq + 1 < arg.size())
+                {
+                    const std::wstring value = arg.substr(eq + 1);
+                    std::string narrow;
+                    narrow.reserve(value.size());
+                    for (wchar_t c : value)
+                    {
+                        narrow.push_back(static_cast<char>(c));
+                    }
+                    options.simulateUpdateVersion = narrow;
+                }
+            }
+        }
+
+        LocalFree(argv);
+        return options;
+    }
+}
+
 int wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int)
 {
+    const AppOptions options = parseOptions();
+
     HANDLE instanceMutex = CreateMutexW(NULL, FALSE,
                                         L"Local\\SpotifyVolumeHotkeys_SingleInstance");
     if (instanceMutex && GetLastError() == ERROR_ALREADY_EXISTS)
@@ -90,7 +135,7 @@ int wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int)
 
         wizard.detach();
 
-        AppController controller(appConfig, auth);
+        AppController controller(appConfig, auth, options);
         if (!controller.startup(hInstance))
         {
             Logger::fatal("Failed to start the application.");
