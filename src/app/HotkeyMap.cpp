@@ -28,6 +28,11 @@ namespace HotkeyMap
         if (upper == "LEFT")  return VK_LEFT;
         if (upper == "RIGHT") return VK_RIGHT;
 
+        if (upper == "VOLUMEUP" || upper == "VOLUME_UP")     return VK_VOLUME_UP;
+        if (upper == "VOLUMEDOWN" || upper == "VOLUME_DOWN") return VK_VOLUME_DOWN;
+        if (upper == "VOLUMEMUTE" || upper == "MUTE" ||
+            upper == "VOLUME_MUTE")                          return VK_VOLUME_MUTE;
+
         if (upper.size() == 1 && upper[0] >= 'A' && upper[0] <= 'Z')
         {
             return (UINT)upper[0];
@@ -62,6 +67,9 @@ namespace HotkeyMap
         if (vk == VK_DOWN)  return "Down";
         if (vk == VK_LEFT)  return "Left";
         if (vk == VK_RIGHT) return "Right";
+        if (vk == VK_VOLUME_UP)   return "VolumeUp";
+        if (vk == VK_VOLUME_DOWN) return "VolumeDown";
+        if (vk == VK_VOLUME_MUTE) return "VolumeMute";
         if ((vk >= 'A' && vk <= 'Z') || (vk >= '0' && vk <= '9'))
         {
             return std::string(1, (char)vk);
@@ -83,7 +91,8 @@ namespace HotkeyMap
         if (toVk(name) == 0)
         {
             outReason = "'" + name +
-                     "' is not a supported key. Use A-Z, 0-9, F1-F24, Space, or an arrow key.";
+                     "' is not a supported key. Use A-Z, 0-9, F1-F24, Space, an arrow key, "
+                     "VolumeUp, VolumeDown, or VolumeMute.";
             return false;
         }
         return true;

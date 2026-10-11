@@ -1,10 +1,10 @@
 # <img src="assets/svh.ico" width="24" alt="Spotify Volume Hotkeys Icon"> Spotify Volume Hotkeys
 
-A lightweight, background Windows system tray utility to control Spotify volume globally via custom hotkeys (defaulting to `F13` and `F14`).
+A lightweight, background Windows system tray utility to control Spotify volume globally via custom hotkeys (defaulting to the keyboard's native `VolumeDown` and `VolumeUp` keys).
 
 ## Features
 
-- **Volume hotkeys from anywhere:** Press `F13` and `F14` (customizable) to lower and raise Spotify's volume while using any application.
+- **Volume hotkeys from anywhere:** Press the keyboard's native volume-down/up keys (customizable, defaults `VolumeDown`/`VolumeUp`) to lower and raise Spotify's volume while using any application.
 - **Runs quietly in the background:** No windows, no terminal — just a small icon in your system tray.
 - **System tray menu:** Left or Right-click the tray icon to see the current status, edit your settings, open the logs, toggle starting with Windows, restart, or exit.
 - **Start with Windows:** Optional autostart so your hotkeys are always ready after a reboot.
@@ -77,9 +77,10 @@ gets out of the way, leaving the app running entirely in the system tray.
      create an app and paste the **Redirect URI** it shows on screen. It then offers to
      open the dashboard for you (`Open the dashboard in your browser now [Y/n]`).
    - **Enter your credentials:** paste the app's **Client ID** and **Client Secret**.
-   - **Choose your hotkeys:** pick the volume-down and volume-up keys (defaults `F13` /
-     `F14`). Valid keys are `A`-`Z`, `0`-`9`, `F1`-`F24`, `Space`, and the arrow keys;
-     press Enter to accept the suggested default.
+   - **Choose your hotkeys:** pick the volume-down and volume-up keys (defaults
+     `VolumeDown` / `VolumeUp`, i.e. the keyboard's own volume keys). Valid keys are
+     `A`-`Z`, `0`-`9`, `F1`-`F24`, `Space`, the arrow keys, and `VolumeUp`/`VolumeDown`/
+     `VolumeMute`; press Enter to accept the suggested default.
    - **Choose startup behaviour:** decide whether the app should start automatically with
      Windows (default yes).
 3. **Log in to Spotify.** A browser window opens; approve access. The wizard confirms
@@ -100,6 +101,21 @@ Once set up, there is no window to manage, only the tray icon:
   Windows**, **Restart**, or **Exit**.
 - Use your hotkeys from any application to change Spotify's volume.
 
+### Using the native volume keys
+
+With the default hotkeys (`VolumeDown` / `VolumeUp`), the app registers the keyboard's own
+volume keys as global hotkeys. While the app is running, pressing them **adjusts Spotify's
+volume and no longer changes the Windows master volume**. When no Spotify playback device is
+active, the keys do nothing at all (the press is still consumed).
+
+> [!NOTE]
+> This relies on the keys reaching Windows as standard `VK_VOLUME_UP` / `VK_VOLUME_DOWN`
+> events, which is true for the vast majority of keyboards and laptops. On some devices the
+> keys are delivered as HID Consumer Control input handled below user mode, in which case the
+> master volume may still change. If the master volume moves (or the app logs that the hotkey
+> is "in use by another application"), pick a different key in `config.json` — for example
+> `F13`/`F14` — via **Edit Config...**.
+
 ### Manual configuration
 
 Prefer editing files? Choose **Edit Config...** from the tray menu, or open
@@ -112,8 +128,8 @@ Prefer editing files? Choose **Edit Config...** from the tray menu, or open
   "refresh_token": "YOUR_SAVED_TOKEN",
   "autostart": true,
   "hotkeys": {
-    "volume_down": "F13",
-    "volume_up": "F14"
+    "volume_down": "VolumeDown",
+    "volume_up": "VolumeUp"
   },
   "pollingIntervals": {
     "input": 250,

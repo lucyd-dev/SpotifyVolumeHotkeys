@@ -263,12 +263,18 @@ void ConsoleWizard::collect(AppConfig &config, const std::string &redirectUri)
 
     section("3. Choose your hotkeys");
     std::cout << "  " << c(DIM)
-              << "Use A-Z, 0-9, F1-F24, Space, or an arrow key. Press Enter to keep a default."
+              << "Use A-Z, 0-9, F1-F24, Space, an arrow key, or VolumeUp/VolumeDown."
+              << c(RESET) << "\n";
+    std::cout << "  " << c(DIM)
+              << "The defaults take over the keyboard's volume keys, so they adjust Spotify"
+              << c(RESET) << "\n";
+    std::cout << "  " << c(DIM)
+              << "instead of the Windows master volume while this app is running."
               << c(RESET) << "\n";
     config.volumeDownKey = promptHotkey(
-        "Volume-down key", config.volumeDownKey.empty() ? "F13" : config.volumeDownKey);
+        "Volume-down key", config.volumeDownKey.empty() ? "VolumeDown" : config.volumeDownKey);
     config.volumeUpKey = promptHotkey(
-        "Volume-up key", config.volumeUpKey.empty() ? "F14" : config.volumeUpKey);
+        "Volume-up key", config.volumeUpKey.empty() ? "VolumeUp" : config.volumeUpKey);
 
     section("4. Startup");
     config.autostart = promptYesNo("Start automatically with Windows", true);

@@ -8,8 +8,8 @@ struct AppConfig
     std::string clientId;
     std::string clientSecret;
     std::string refreshToken;
-    std::string volumeDownKey = "F13";
-    std::string volumeUpKey = "F14";
+    std::string volumeDownKey = "VolumeDown";
+    std::string volumeUpKey = "VolumeUp";
     bool autostart = true;
     int inputTimerInterval = 250;
     int playerTimerInterval = 5000;
