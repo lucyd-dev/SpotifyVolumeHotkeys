@@ -51,7 +51,7 @@ jobs:
             ${{ runner.os }}-vcpkg-binary-
 
       - name: Configure (VS preset)
-        run: cmake --preset windows-vs -DSVH_VERSION=${{ github.ref_name }}
+        run: cmake --preset windows-vs "-DSVH_VERSION=${{ github.ref_name }}"
 
       - name: Build (Release)
         run: cmake --build --preset release
