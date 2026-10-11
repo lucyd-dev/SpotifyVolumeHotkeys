@@ -81,6 +81,11 @@ namespace HotkeyMap
         return "";
     }
 
+    bool isMediaKey(UINT vk)
+    {
+        return vk == VK_VOLUME_UP || vk == VK_VOLUME_DOWN || vk == VK_VOLUME_MUTE;
+    }
+
     bool validate(const std::string &name, std::string &outReason)
     {
         if (name.empty())

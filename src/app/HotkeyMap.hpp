@@ -11,4 +11,5 @@ namespace HotkeyMap
     std::string fromVk(UINT vk);
     std::string normalize(const std::string &name);
     bool validate(const std::string &name, std::string &reason);
+    bool isMediaKey(UINT vk);
 }

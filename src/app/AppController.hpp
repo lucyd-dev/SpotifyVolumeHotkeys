@@ -5,6 +5,7 @@
 #include <string>
 #include "HiddenWindow.hpp"
 #include "TrayIcon.hpp"
+#include "KeyboardHook.hpp"
 #include "../core/Config.hpp"
 #include "../auth/Auth.hpp"
 #include "../volume/Volume.hpp"
@@ -28,6 +29,7 @@ public:
     static constexpr UINT_PTR TIMER_CONFIG = 3;
     static const UINT CONFIG_TIMER_INTERVAL = 2000;
     static const UINT WM_TRAY_CALLBACK = WM_APP + 1;
+    static const UINT WM_APP_HOOK_KEY = WM_APP + 2;
     static const int VOLUME_CHANGE_STEP = 2;
 
     AppController(AppConfig config, Auth &auth);
@@ -41,10 +43,11 @@ public:
 
 private:
     void applyHotkeys();
-    void registerHotkey(const std::string &name, const UINT id);
     void updateCurrentVolume();
     void updateTrayStatus();
+    void triggerVolume(int step);
     void onHotkey(WPARAM wParam);
+    void onHookKey(WPARAM wParam);
     void onInputTimer();
     void onPlayerTimer();
     void onConfigTimer();
@@ -59,6 +62,7 @@ private:
 
     HiddenWindow m_window;
     TrayIcon m_tray;
+    KeyboardHook m_keyboardHook;
     AppConfig m_appConfig;
     Config m_config;
     Auth &m_auth;

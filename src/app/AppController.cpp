@@ -92,6 +92,8 @@ void AppController::shutdown()
         m_hotkeyUpRegistered = false;
     }
 
+    m_keyboardHook.stop();
+
     m_tray.remove();
     m_window.destroy();
 }
@@ -125,6 +127,10 @@ bool AppController::handleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
         onTrayCallback(lParam);
         return true;
 
+    case WM_APP_HOOK_KEY:
+        onHookKey(wParam);
+        return true;
+
     default:
         return false;
     }
@@ -143,44 +149,82 @@ void AppController::applyHotkeys()
         m_hotkeyUpRegistered = false;
     }
 
-    registerHotkey(m_appConfig.volumeDownKey, HOTKEY_VOL_DOWN);
-    registerHotkey(m_appConfig.volumeUpKey, HOTKEY_VOL_UP);
-}
+    m_keyboardHook.stop();
 
-void AppController::registerHotkey(const std::string &name, const UINT id)
-{
-    std::string reason;
-    if (!HotkeyMap::validate(name, reason))
-    {
-        Logger::warn("Invalid hotkey: " + reason);
-        return;
-    }
+    std::vector<UINT> hookKeys;
 
-    if (RegisterHotKey(m_window.handle(), id, 0,
-                            HotkeyMap::toVk(name)))
+    auto applyKey = [&](const std::string &name, const UINT id, bool &registered)
     {
-        if (id == HOTKEY_VOL_DOWN)
+        std::string reason;
+        if (!HotkeyMap::validate(name, reason))
         {
-            m_hotkeyDownRegistered = true;
+            Logger::warn("Invalid hotkey: " + reason);
+            return;
+        }
+
+        UINT vk = HotkeyMap::toVk(name);
+
+        // Media keys are handled by the low-level hook so they also work while
+        // a game holds the keyboard in exclusive mode (where RegisterHotKey is
+        // disabled by the system).
+        if (HotkeyMap::isMediaKey(vk))
+        {
+            hookKeys.push_back(vk);
+            return;
+        }
+
+        if (RegisterHotKey(m_window.handle(), id, 0, vk))
+        {
+            registered = true;
         }
         else
         {
-            m_hotkeyUpRegistered = true;
+            Logger::warn("Hotkey " + name + " in use by another application");
         }
-        return;
-    }
+    };
 
-    Logger::warn("Hotkey " + name + " in use by another application");
+    applyKey(m_appConfig.volumeDownKey, HOTKEY_VOL_DOWN, m_hotkeyDownRegistered);
+    applyKey(m_appConfig.volumeUpKey, HOTKEY_VOL_UP, m_hotkeyUpRegistered);
+
+    if (!hookKeys.empty())
+    {
+        m_keyboardHook.setKeys(hookKeys);
+        if (m_keyboardHook.start(m_window.handle(), WM_APP_HOOK_KEY))
+        {
+            Logger::info("Low-level keyboard hook active for native media keys.");
+        }
+        else
+        {
+            Logger::warn("Failed to install the low-level keyboard hook; media keys "
+                         "may fall back to the Windows master volume in games.");
+        }
+    }
+}
+
+void AppController::triggerVolume(int step)
+{
+    m_pendingVolume += step;
+    m_inputDebounceActive = true;
+    SetTimer(m_window.handle(), TIMER_INPUT, m_appConfig.inputTimerInterval, NULL);
 }
 
 void AppController::onHotkey(WPARAM wParam)
 {
     int id = (int)wParam;
-    int step = (id == HOTKEY_VOL_UP) ? VOLUME_CHANGE_STEP : -VOLUME_CHANGE_STEP;
+    triggerVolume(id == HOTKEY_VOL_UP ? VOLUME_CHANGE_STEP : -VOLUME_CHANGE_STEP);
+}
 
-    m_pendingVolume += step;
-    m_inputDebounceActive = true;
-    SetTimer(m_window.handle(), TIMER_INPUT, m_appConfig.inputTimerInterval, NULL);
+void AppController::onHookKey(WPARAM wParam)
+{
+    UINT vk = (UINT)wParam;
+    if (vk == HotkeyMap::toVk(m_appConfig.volumeUpKey))
+    {
+        triggerVolume(VOLUME_CHANGE_STEP);
+    }
+    else if (vk == HotkeyMap::toVk(m_appConfig.volumeDownKey))
+    {
+        triggerVolume(-VOLUME_CHANGE_STEP);
+    }
 }
 
 void AppController::updateCurrentVolume()
