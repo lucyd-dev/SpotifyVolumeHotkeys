@@ -64,8 +64,7 @@ int wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int)
                                         L"Local\\SpotifyVolumeHotkeys_SingleInstance");
     if (instanceMutex && GetLastError() == ERROR_ALREADY_EXISTS)
     {
-        MessageBoxW(NULL, L"Another instance is already running in the tray.",
-                    L"SpotifyVolumeHotkeys", MB_OK | MB_ICONINFORMATION);
+        // Already running in the tray; leave silently.
         CloseHandle(instanceMutex);
         return 0;
     }

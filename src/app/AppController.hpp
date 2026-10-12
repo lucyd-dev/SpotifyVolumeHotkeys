@@ -44,6 +44,7 @@ public:
     static const UINT WM_TRAY_CALLBACK = WM_APP + 1;
     static const UINT WM_APP_HOOK_KEY = WM_APP + 2;
     static const UINT WM_APP_UPDATE_RESULT = WM_APP + 3;
+    static const UINT WM_APP_INSTALL_RESULT = WM_APP + 4;
     static const int VOLUME_CHANGE_STEP = 2;
 
     AppController(AppConfig config, Auth &auth, AppOptions options = {});
@@ -79,6 +80,9 @@ private:
     void showUpdatePrompt();
     void openReleasePage();
     std::wstring updateMenuLabel() const;
+    bool canSelfInstall() const;
+    void startInstall();
+    void onInstallResult();
 
     HiddenWindow m_window;
     TrayIcon m_tray;
@@ -109,4 +113,12 @@ private:
     bool m_updateDismissed = false;
     std::string m_updateLatest;
     std::string m_updateUrl;
+    std::string m_installerUrl;
+    std::string m_installerSha256;
+
+    std::thread m_installThread;
+    std::mutex m_installMutex;
+    std::atomic<bool> m_installRunning{false};
+    bool m_installOk = false;
+    std::string m_installError;
 };

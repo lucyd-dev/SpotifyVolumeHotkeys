@@ -7,7 +7,7 @@ A lightweight, background Windows system tray utility to control Spotify volume 
 - **Volume hotkeys from anywhere:** Press the keyboard's native volume-down/up keys (customizable, defaults `VolumeDown`/`VolumeUp`) to lower and raise Spotify's volume while using any application.
 - **Runs quietly in the background:** No windows, no terminal — just a small icon in your system tray.
 - **System tray menu:** Left or Right-click the tray icon to see the current status, check for updates, edit your settings, open the logs, toggle starting with Windows, restart, or exit.
-- **Update notifications:** On startup the app quietly checks GitHub for a newer release and offers to open the download page, both in a dialog and via the tray menu.
+- **Self-updating:** On startup the app quietly checks GitHub for a newer release and, when one exists, offers to download and install it in place — both in a dialog and via the tray menu.
 - **Start with Windows:** Optional autostart so your hotkeys are always ready after a reboot.
 - **Edit settings without restarting:** Save changes to your config file and they take effect automatically.
 - **First-run setup wizard:** Walking you through connecting to Spotify and setting your hotkeys.
@@ -15,6 +15,23 @@ A lightweight, background Windows system tray utility to control Spotify volume 
 
 > [!IMPORTANT]
 > Experience is not buttery smooth as wanted, thats due to Spotify's API being heavily rate-limited. See the [Rate Limiting](#rate-limiting) section below.
+
+---
+
+## Installation
+
+Download `SpotifyVolumeHotkeys-Setup-<version>.exe` from the
+[latest release](https://github.com/lucyd-dev/SpotifyVolumeHotkeys/releases/latest)
+and run it. It installs per-user to
+`%LocalAppData%\Programs\SpotifyVolumeHotkeys` (no administrator rights needed) and
+creates a Start Menu shortcut. Future updates are downloaded and installed in place
+from within the app.
+
+> [!NOTE]
+> The installer is not code-signed, so Windows SmartScreen may show a
+> "Windows protected your PC" prompt the first time you run it manually. Choose
+> **More info** → **Run anyway**. Updates installed from inside the app are not
+> affected.
 
 ---
 
@@ -99,8 +116,9 @@ Once set up, there is no window to manage, only the tray icon:
 - The top entry shows the current status, e.g. `Player active · 42%`, `No active device`,
   or `Rate limited`.
 - From the menu you can **Check for Updates...** (or **Update to vX.Y.Z...** when a newer
-  release is known), **Edit Config...**, **Open Logs...**, toggle **Start with
-  Windows**, **Restart**, or **Exit**.
+  release is known, which downloads and installs it), **GitHub Repository...**,
+  **Edit Config...**, **Open Logs...**, toggle **Start with Windows**, **Restart**,
+  or **Exit**.
 - Use your hotkeys from any application to change Spotify's volume.
 
 ### Using the native volume keys

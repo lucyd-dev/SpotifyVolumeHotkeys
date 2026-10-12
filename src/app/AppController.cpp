@@ -4,6 +4,7 @@
 #include "Autostart.hpp"
 #include "Version.hpp"
 #include "../core/Logger.hpp"
+#include "../core/Updater.hpp"
 #include <vector>
 
 #define WIN32_LEAN_AND_MEAN
@@ -97,6 +98,10 @@ void AppController::shutdown()
     {
         m_updateThread.join();
     }
+    if (m_installThread.joinable())
+    {
+        m_installThread.join();
+    }
 
     KillTimer(m_window.handle(), TIMER_INPUT);
     KillTimer(m_window.handle(), TIMER_PLAYER);
@@ -156,6 +161,16 @@ bool AppController::handleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
 
     case WM_APP_UPDATE_RESULT:
         onUpdateResult();
+        return true;
+
+    case WM_APP_INSTALL_RESULT:
+        onInstallResult();
+        return true;
+
+    case WM_CLOSE:
+        // Lets the installer's Restart Manager close us cleanly during a manual
+        // upgrade while the tray instance is still running.
+        requestExit();
         return true;
 
     default:
@@ -437,7 +452,14 @@ void AppController::handleMenuCommand(int cmd)
     case TrayIcon::MenuCheckUpdate:
         if (m_updateAvailable)
         {
-            openReleasePage();
+            if (canSelfInstall())
+            {
+                startInstall();
+            }
+            else
+            {
+                openReleasePage();
+            }
         }
         else
         {
@@ -601,6 +623,8 @@ void AppController::onUpdateResult()
         m_updateAvailable = true;
         m_updateLatest = result.latestVersion;
         m_updateUrl = result.releaseUrl;
+        m_installerUrl = result.installerUrl;
+        m_installerSha256 = result.installerSha256;
         Logger::info("Update available: v" + m_updateLatest + " (running v" +
                      std::string(Version::String) + ").");
         if (!m_updateDismissed || m_manualCheck)
@@ -613,10 +637,12 @@ void AppController::onUpdateResult()
 
 void AppController::showUpdatePrompt()
 {
+    const bool selfInstall = canSelfInstall();
+
     std::string text = "A new version of Spotify Volume Hotkeys is available.\n\n"
                        "Installed: v" + std::string(Version::String) + "\n"
-                       "Latest:    v" + m_updateLatest + "\n\n"
-                       "Open the download page now?";
+                       "Latest:    v" + m_updateLatest + "\n\n";
+    text += selfInstall ? "Download and install it now?" : "Open the download page now?";
 
     std::vector<wchar_t> wtext = Logger::utf16(text);
     const int choice = MessageBoxW(m_window.handle(), wtext.data(),
@@ -624,11 +650,107 @@ void AppController::showUpdatePrompt()
                                    MB_YESNO | MB_ICONINFORMATION | MB_TOPMOST);
     if (choice == IDYES)
     {
-        openReleasePage();
+        if (selfInstall)
+        {
+            startInstall();
+        }
+        else
+        {
+            openReleasePage();
+        }
     }
     else
     {
         m_updateDismissed = true; // suppress only for this session
+    }
+}
+
+bool AppController::canSelfInstall() const
+{
+    return !m_installerUrl.empty() && !m_installerSha256.empty() &&
+           Updater::isManagedInstall();
+}
+
+void AppController::startInstall()
+{
+    if (m_installRunning.load())
+    {
+        return;
+    }
+    if (m_installThread.joinable())
+    {
+        m_installThread.join();
+    }
+
+    const std::string url = m_installerUrl;
+    const std::string sha = m_installerSha256;
+    if (url.empty() || sha.empty())
+    {
+        openReleasePage();
+        return;
+    }
+
+    m_installRunning = true;
+    Logger::info("Downloading update from " + url);
+
+    m_installThread = std::thread([this, url, sha]()
+    {
+        struct RunningGuard
+        {
+            std::atomic<bool> &flag;
+            ~RunningGuard() { flag = false; }
+        } guard{m_installRunning};
+
+        std::wstring installerPath;
+        std::string error;
+        bool ok = false;
+        if (Updater::downloadInstaller(url, sha, installerPath, error))
+        {
+            Logger::info("Update downloaded and verified; launching installer.");
+            ok = Updater::runInstaller(installerPath, error);
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(m_installMutex);
+            m_installOk = ok;
+            m_installError = error;
+        }
+
+        if (!m_updateStop.load())
+        {
+            PostMessageW(m_window.handle(), WM_APP_INSTALL_RESULT, 0, 0);
+        }
+    });
+}
+
+void AppController::onInstallResult()
+{
+    bool ok = false;
+    std::string error;
+    {
+        std::lock_guard<std::mutex> lock(m_installMutex);
+        ok = m_installOk;
+        error = m_installError;
+    }
+
+    if (ok)
+    {
+        Logger::info("Installer launched; exiting so it can replace the running files.");
+        m_exitAction = ExitAction::Exit;
+        PostQuitMessage(0);
+        return;
+    }
+
+    Logger::error("Update install failed: " + error);
+    std::string text = "Could not install the update.\n\n" + error +
+                       "\n\nYou can also download it from the release page.";
+    std::vector<wchar_t> wtext = Logger::utf16(text);
+    const int choice = MessageBoxW(m_window.handle(), wtext.data(),
+                                   L"Spotify Volume Hotkeys \u2014 Update Failed",
+                                   MB_YESNO | MB_ICONWARNING | MB_TOPMOST);
+    if (choice == IDYES)
+    {
+        openReleasePage();
     }
 }
 

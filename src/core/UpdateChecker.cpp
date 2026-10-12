@@ -1,7 +1,10 @@
 #include "UpdateChecker.hpp"
 #include "HttpClient.hpp"
 
+#include <nlohmann/json.hpp>
+
 #include <algorithm>
+#include <cstdlib>
 #include <vector>
 
 namespace
@@ -100,6 +103,69 @@ namespace UpdateChecker
     {
         Result result;
         result.currentVersion = currentVersion;
+
+        // Test hook: point the update source at a local server. When set, the
+        // GitHub tag-redirect fallback is skipped so the test stays hermetic.
+        const char *envBase = std::getenv("SVH_UPDATE_BASE_URL");
+        const bool customBase = (envBase != nullptr && envBase[0] != '\0');
+        const std::string base = customBase
+                                     ? std::string(envBase)
+                                     : ("https://github.com/" + owner + "/" + repo);
+
+        // Preferred path: the machine-readable manifest a release publishes as
+        // version.json, reachable via the stable "latest/download" URL. It also
+        // carries the installer URL and its SHA-256 for the in-app updater.
+        const std::string manifestUrl = base + "/releases/latest/download/version.json";
+        std::string manifest;
+        std::string manifestError;
+        if (HttpClient::getFollowingRedirects(manifestUrl, manifest, manifestError))
+        {
+            // Tolerate a UTF-8 BOM in case the manifest was produced by a tool
+            // that writes one.
+            if (manifest.size() >= 3 &&
+                static_cast<unsigned char>(manifest[0]) == 0xEF &&
+                static_cast<unsigned char>(manifest[1]) == 0xBB &&
+                static_cast<unsigned char>(manifest[2]) == 0xBF)
+            {
+                manifest.erase(0, 3);
+            }
+
+            try
+            {
+                const auto json = nlohmann::json::parse(manifest);
+                std::string version = json.value("version", std::string());
+                if (!version.empty() && (version[0] == 'v' || version[0] == 'V'))
+                {
+                    version = version.substr(1);
+                }
+                if (!version.empty())
+                {
+                    result.latestVersion = version;
+                    result.installerUrl = json.value("installer_url", std::string());
+                    result.installerSha256 = json.value("sha256", std::string());
+                    result.releaseUrl = json.value("notes_url", std::string());
+                    if (result.releaseUrl.empty())
+                    {
+                        result.releaseUrl = base + "/releases/latest";
+                    }
+                    result.status = isNewer(version, currentVersion)
+                                        ? Result::Status::UpdateAvailable
+                                        : Result::Status::UpToDate;
+                    return result;
+                }
+            }
+            catch (const std::exception &)
+            {
+                // fall through to the tag-redirect fallback
+            }
+        }
+
+        if (customBase)
+        {
+            result.status = Result::Status::Failed;
+            result.detail = "update manifest unavailable at the configured base URL";
+            return result;
+        }
 
         auto client = HttpClient::getClient("https://github.com");
         client->set_follow_location(false);

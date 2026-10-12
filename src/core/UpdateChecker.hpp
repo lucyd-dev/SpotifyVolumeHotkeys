@@ -15,9 +15,11 @@ namespace UpdateChecker
 
         Status status = Status::Failed;
         std::string currentVersion;
-        std::string latestVersion; // without a leading 'v'
-        std::string releaseUrl;    // human-facing release/tag page
-        std::string detail;        // populated when status == Failed
+        std::string latestVersion;   // without a leading 'v'
+        std::string releaseUrl;      // human-facing release/tag page
+        std::string installerUrl;    // release installer asset (from manifest)
+        std::string installerSha256; // lowercase hex, verified before running
+        std::string detail;          // populated when status == Failed
     };
 
     // Dotted numeric comparison; a leading 'v' and any -prerelease/+build

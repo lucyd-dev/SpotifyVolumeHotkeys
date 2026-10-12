@@ -2,6 +2,8 @@
 build/
 bin/
 out/
+staging/
+dist/
 CMakeCache.txt
 CMakeFiles/
 *.dir/

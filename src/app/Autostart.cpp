@@ -4,6 +4,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <cstdint>
+#include <cwctype>
+#include <string>
 
 namespace
 {
@@ -21,17 +23,61 @@ namespace
         buf[len] = L'\0';
         return std::wstring(buf);
     }
+
+    std::wstring readStoredValue()
+    {
+        DWORD type = 0;
+        DWORD size = 0;
+        if (RegGetValueW(HKEY_CURRENT_USER, RUN_KEY, RUN_VALUE, RRF_RT_REG_SZ,
+                         &type, nullptr, &size) != ERROR_SUCCESS || size == 0)
+        {
+            return std::wstring();
+        }
+
+        std::wstring buffer(size / sizeof(wchar_t), L'\0');
+        if (RegGetValueW(HKEY_CURRENT_USER, RUN_KEY, RUN_VALUE, RRF_RT_REG_SZ,
+                         &type, buffer.data(), &size) != ERROR_SUCCESS)
+        {
+            return std::wstring();
+        }
+        while (!buffer.empty() && buffer.back() == L'\0')
+        {
+            buffer.pop_back();
+        }
+        return buffer;
+    }
+
+    bool equalsIgnoreCase(const std::wstring &a, const std::wstring &b)
+    {
+        if (a.size() != b.size())
+        {
+            return false;
+        }
+        for (std::size_t i = 0; i < a.size(); ++i)
+        {
+            if (towlower(a[i]) != towlower(b[i]))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
 }
 
 namespace Autostart
 {
     bool isEnabled()
     {
-        DWORD type = 0;
-        DWORD size = 0;
-        LONG res = RegGetValueW(HKEY_CURRENT_USER, RUN_KEY, RUN_VALUE,
-                                RRF_RT_REG_SZ, &type, NULL, &size);
-        return res == ERROR_SUCCESS && size > 0;
+        // Treat the entry as enabled only when it points at the current binary.
+        // A moved/renamed install then self-heals via setEnabled(true) instead
+        // of leaving a stale autostart path behind.
+        const std::wstring stored = readStoredValue();
+        if (stored.empty())
+        {
+            return false;
+        }
+        const std::wstring expected = L"\"" + commandLine() + L"\"";
+        return equalsIgnoreCase(stored, expected);
     }
 
     bool setEnabled(bool enabled)
